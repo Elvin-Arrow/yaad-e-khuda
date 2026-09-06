@@ -17,6 +17,9 @@ dependencies = [
     "apscheduler>=3.10",
 ]
 
+[project.scripts]
+yaad = "prayer_sync.cli:main"
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
