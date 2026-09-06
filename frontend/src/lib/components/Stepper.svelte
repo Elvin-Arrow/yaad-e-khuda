@@ -7,11 +7,38 @@
   function inc() {
     onchange?.(Math.min(max, value + step))
   }
+
+  function commit(e) {
+    const parsed = Number(e.target.value)
+    if (Number.isNaN(parsed)) {
+      e.target.value = value // revert visually to the last good value
+      return
+    }
+    onchange?.(Math.min(max, Math.max(min, parsed)))
+  }
+
+  function handleKeydown(e) {
+    if (e.key === 'Enter') e.target.blur() // force commit without needing a click elsewhere
+  }
 </script>
 
 <div class="stepper">
   <button class="step" onclick={dec} disabled={value <= min} aria-label="Decrease minutes">−</button>
-  <span class="value tabular">{value}m</span>
+  <span class="value-wrap">
+    <input
+      class="value tabular"
+      type="number"
+      inputmode="numeric"
+      {min}
+      {max}
+      {step}
+      {value}
+      onchange={commit}
+      onkeydown={handleKeydown}
+      aria-label="Minutes before"
+    />
+    <span class="unit">min</span>
+  </span>
   <button class="step" onclick={inc} disabled={value >= max} aria-label="Increase minutes">+</button>
 </div>
 
@@ -39,6 +66,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    flex-shrink: 0;
   }
 
   .step:disabled {
@@ -46,11 +74,41 @@
     cursor: default;
   }
 
+  .value-wrap {
+    display: flex;
+    align-items: baseline;
+    gap: 3px;
+  }
+
   .value {
-    min-width: 40px;
+    width: 32px;
     text-align: center;
     font-size: 14px;
     font-weight: 600;
     color: var(--label-primary);
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-standard);
+    padding: 4px 0;
+    font-family: inherit;
+    -moz-appearance: textfield;
+  }
+
+  /* hide the native spinner arrows -- the step buttons already cover that */
+  .value::-webkit-inner-spin-button,
+  .value::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  .value:focus {
+    outline: none;
+    background: var(--surface-2);
+  }
+
+  .unit {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--label-tertiary);
   }
 </style>
