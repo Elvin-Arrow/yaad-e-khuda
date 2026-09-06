@@ -50,7 +50,7 @@
     padding: 10px 14px;
     color: var(--label-primary);
     font-size: 17px;
-    color-scheme: dark;
+    color-scheme: var(--color-scheme);
     align-self: flex-start;
   }
 </style>

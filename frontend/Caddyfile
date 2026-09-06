@@ -1,0 +1,21 @@
+:80 {
+	root * /srv
+	encode gzip zstd
+
+	# `route` forces literal, as-written order -- bare top-level directives
+	# get silently reordered by Caddy's own fixed directive priority
+	# instead (file_server/try_files would otherwise run before
+	# reverse_proxy and swallow every /api/* request into index.html).
+	route {
+		# "backend" resolves via Docker Compose's internal DNS to the
+		# backend service/container -- see docker-compose.yml. Caddy
+		# forwards the matched path as-is (unlike nginx, no
+		# prefix-stripping to get right), so /api/config here reaches
+		# backend:8000/api/config unchanged.
+		reverse_proxy /api/* backend:8000
+
+		# SPA fallback: any non-file route still resolves to index.html.
+		try_files {path} /index.html
+		file_server
+	}
+}

@@ -71,7 +71,7 @@
 
   .btn.filled {
     background: var(--fill-neutral);
-    color: #fff;
+    color: var(--label-primary);
     font-size: 15px;
     font-weight: 600;
     border-radius: var(--radius-comfortable);
