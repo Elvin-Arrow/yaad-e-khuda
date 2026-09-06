@@ -1,0 +1,49 @@
+# Copy this file to config.yaml and fill in your details.
+# config.yaml is gitignored and should be chmod 600 (it holds a real credential).
+
+mosque:
+  # The mosque's Mawaqit slug, i.e. the last path segment of its page URL:
+  # https://mawaqit.net/en/<slug>
+  slug: "your-mosque-slug"
+
+  # Optional. Normally the mosque's IANA timezone is read straight out of
+  # its own confData ("timezone" field) and this can stay null. Only set
+  # this if you need to override what the mosque page reports.
+  timezone_override: null
+
+icloud:
+  apple_id: "you@icloud.com"
+
+  # An app-specific password, NOT your real Apple ID password.
+  # Generate one at https://appleid.apple.com under Security ->
+  # App-Specific Passwords.
+  app_specific_password: "xxxx-xxxx-xxxx-xxxx"
+
+  # Name of the dedicated calendar these events are written to. Created
+  # automatically if it doesn't exist yet (see README for the manual
+  # fallback if calendar auto-creation fails against iCloud).
+  calendar_name: "Prayer Reminders"
+
+# Per-prayer settings. minutes_before is how long before Iqama the alarm
+# fires. Setting enabled: false removes/skips this prayer's event
+# entirely (including deleting one that was already synced before it was
+# disabled).
+prayers:
+  fajr:    { enabled: true, minutes_before: 10 }
+  dhuhr:   { enabled: true, minutes_before: 10 }
+  asr:     { enabled: true, minutes_before: 10 }
+  maghrib: { enabled: true, minutes_before: 5 }
+  isha:    { enabled: true, minutes_before: 10 }
+
+# Where the fetcher writes today's computed prayer times, and the
+# calendar sync reads them from. Relative paths are resolved from the
+# current working directory the command is run from.
+state_file: "state/today.json"
+
+# When `python -m prayer_sync serve` runs, it schedules the daily
+# fetch-then-sync itself at this local server-clock time (24h "HH:MM").
+# Editable from the Settings UI's Schedule card without restarting the
+# server. Irrelevant to the `fetch`/`sync` CLI subcommands themselves --
+# those still run whenever invoked (by hand or by cron).
+schedule:
+  time: "03:00"
