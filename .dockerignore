@@ -1,0 +1,17 @@
+.venv/
+frontend/node_modules/
+frontend/dist/
+tests/
+.pytest_cache/
+__pycache__/
+*.pyc
+*.egg-info/
+state/
+logs/
+data/
+config.yaml
+config.yaml.bak
+.git/
+.claude/
+docs/
+README.md

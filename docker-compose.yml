@@ -1,0 +1,20 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    working_dir: /data
+    volumes:
+      - ./data:/data # config.yaml + state/ persist here across rebuilds -- create it once: mkdir -p data
+    ports:
+      - "8100:8000" # optional: direct API access, bypassing the frontend's nginx proxy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "8180:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
