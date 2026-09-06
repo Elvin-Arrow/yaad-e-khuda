@@ -1,4 +1,9 @@
-"""Command-line entry points: `python -m prayer_sync fetch|sync|serve`."""
+"""Command-line entry points: `yaad fetch|sync|serve`.
+
+Registered as the `yaad` console script via pyproject.toml's
+[project.scripts]; `python -m prayer_sync ...` still works too (same
+main(), see __main__.py), it's just not the documented name anymore.
+"""
 
 from __future__ import annotations
 
@@ -57,7 +62,7 @@ def main(argv: list[str] | None = None) -> int:
         "-c", "--config", default="config.yaml", help="path to config.yaml"
     )
 
-    parser = argparse.ArgumentParser(prog="prayer_sync", parents=[config_parent])
+    parser = argparse.ArgumentParser(prog="yaad", parents=[config_parent])
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser(
         "fetch", parents=[config_parent], help="fetch today's prayer times from Mawaqit"
