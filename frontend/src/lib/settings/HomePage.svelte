@@ -11,6 +11,9 @@
     <div>
       <p class="eyebrow">TODAY</p>
       <h1>Prayer Reminders</h1>
+      {#if todayData.mosque_name}
+        <p class="mosque-name">{todayData.mosque_name}</p>
+      {/if}
     </div>
     <button class="icon-btn" onclick={onOpenSettings} aria-label="Open settings">
       <svg
@@ -63,6 +66,13 @@
     font-size: 34px;
     font-weight: 800;
     letter-spacing: -0.8px;
+  }
+
+  .mosque-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--label-secondary);
+    margin-top: 2px;
   }
 
   .icon-btn {
