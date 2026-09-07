@@ -85,7 +85,7 @@
   }
 
   .progress {
-    filter: drop-shadow(0 0 10px rgba(255, 55, 95, 0.55));
+    filter: drop-shadow(0 0 4px rgba(255, 55, 95, 0.35));
     transition: stroke-dashoffset 600ms ease-out;
   }
 
