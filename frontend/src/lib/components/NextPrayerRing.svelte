@@ -1,7 +1,4 @@
 <script>
-  // A single-ring nod to the Fitness rings motif: progress from the
-  // previous enabled prayer's Iqama to the next one, Move-pink on a
-  // 22%-opacity track, tabular countdown at center.
   let { nextPrayer } = $props()
 
   let now = $state(new Date())

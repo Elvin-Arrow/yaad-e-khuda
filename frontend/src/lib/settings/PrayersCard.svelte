@@ -8,16 +8,9 @@
 
   const PRAYER_NAMES = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']
 
-  // Local editable copy: this card owns all 5 rows' state so an autosave
-  // always sends a complete, internally-consistent prayers map.
-  // config is itself a $state in Settings.svelte, so config.prayers here is
-  // a reactive Proxy -- structuredClone() cannot clone a Proxy (throws
-  // "DOMException: Proxy object could not be cloned"). $state.snapshot()
-  // is Svelte 5's purpose-built plain-object snapshot for exactly this.
-  // svelte-ignore state_referenced_locally -- deliberate: seed once, see MosqueCard.svelte
   let prayers = $state($state.snapshot(config.prayers))
 
-  let saveState = $state('idle') // idle | saving | saved
+  let saveState = $state('idle')
   let saveTimer
 
   function scheduleSave() {

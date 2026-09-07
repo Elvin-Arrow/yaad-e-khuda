@@ -11,14 +11,14 @@
   function commit(e) {
     const parsed = Number(e.target.value)
     if (Number.isNaN(parsed)) {
-      e.target.value = value // revert visually to the last good value
+      e.target.value = value
       return
     }
     onchange?.(Math.min(max, Math.max(min, parsed)))
   }
 
   function handleKeydown(e) {
-    if (e.key === 'Enter') e.target.blur() // force commit without needing a click elsewhere
+    if (e.key === 'Enter') e.target.blur()
   }
 </script>
 
@@ -94,7 +94,6 @@
     -moz-appearance: textfield;
   }
 
-  /* hide the native spinner arrows -- the step buttons already cover that */
   .value::-webkit-inner-spin-button,
   .value::-webkit-outer-spin-button {
     -webkit-appearance: none;

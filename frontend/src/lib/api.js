@@ -17,9 +17,7 @@ async function request(method, path, body) {
   let data = null
   try {
     data = await res.json()
-  } catch {
-    // no body, or not JSON -- fine, data stays null
-  }
+  } catch {}
 
   if (!res.ok) {
     const detail = data?.detail

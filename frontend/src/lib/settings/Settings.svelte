@@ -7,7 +7,7 @@
   let config = $state(null)
   let todayData = $state(null)
   let loadErr = $state('')
-  let page = $state('home') // 'home' | 'settings'
+  let page = $state('home')
 
   async function loadAll() {
     try {
@@ -22,7 +22,7 @@
 
   onMount(() => {
     loadAll()
-    const id = setInterval(loadAll, 60_000) // keep the ring/times fresh
+    const id = setInterval(loadAll, 60_000)
     return () => clearInterval(id)
   })
 </script>

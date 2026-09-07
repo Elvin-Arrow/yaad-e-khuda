@@ -12,9 +12,7 @@
   async function load() {
     try {
       status = await api.syncStatus()
-    } catch {
-      // leave status as-is; the card just shows nothing extra
-    }
+    } catch {}
   }
 
   async function runNow() {

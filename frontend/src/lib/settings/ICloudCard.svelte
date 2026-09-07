@@ -7,9 +7,7 @@
 
   let { config, onSaved } = $props()
 
-  // svelte-ignore state_referenced_locally -- deliberate: seed once, see MosqueCard.svelte
   let appleId = $state(config.icloud.apple_id)
-  // svelte-ignore state_referenced_locally
   let calendarName = $state(config.icloud.calendar_name)
   let password = $state('')
   let saving = $state(false)

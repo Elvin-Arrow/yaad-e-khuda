@@ -1,6 +1,6 @@
 <script>
   let {
-    variant = 'primary', // primary | tinted | filled | plain
+    variant = 'primary',
     disabled = false,
     full = false,
     type = 'button',

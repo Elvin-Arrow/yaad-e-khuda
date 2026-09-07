@@ -7,9 +7,6 @@
 
   let { config, onSaved } = $props()
 
-  // svelte-ignore state_referenced_locally -- deliberate: seed the editable
-  // field once from the loaded config, don't let a background poll refresh
-  // clobber an in-progress edit.
   let slug = $state(config.mosque.slug)
   let saving = $state(false)
   let error = $state('')

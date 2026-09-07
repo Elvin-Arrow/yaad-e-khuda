@@ -4,7 +4,7 @@
   import Onboarding from './lib/onboarding/Onboarding.svelte'
   import Settings from './lib/settings/Settings.svelte'
 
-  let status = $state(null) // null = still loading
+  let status = $state(null)
   let loadError = $state('')
 
   async function loadStatus() {

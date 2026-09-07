@@ -1,14 +1,6 @@
-/* Design tokens translated from the Apple Fitness design system guide.
-   Dark (true-black canvas, grouped system cards, label-opacity ramp) is
-   the default/primary appearance; a light variant is layered on top via
-   [data-theme="light"] on <html>, set by theme.js. The three ring/accent
-   colors never restyle between themes -- only canvas/surface/label
-   tokens change, per the guide's own "ring colors are sacred" rule. */
-
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 :root {
-  /* Canvas & surfaces (dark, default) */
   --canvas: #000000;
   --surface-1: #1c1c1e;
   --surface-2: #2c2c2e;
@@ -16,39 +8,32 @@
   --separator: #38383a;
   --color-scheme: dark;
 
-  /* Chrome accent (Move-pink) -- identical in both themes */
   --accent: #ff375f;
   --accent-pressed: #d80e45;
   --accent-track: rgba(250, 17, 79, 0.22);
   --accent-tint: rgba(250, 17, 79, 0.18);
   --accent-tint-pressed: rgba(250, 17, 79, 0.28);
 
-  /* Neutral fill (segmented tracks, filled buttons) */
   --fill-neutral: rgba(118, 118, 128, 0.24);
   --fill-neutral-pressed: rgba(118, 118, 128, 0.34);
 
-  /* Label opacity ramp (dark, default) */
   --label-primary: #ffffff;
   --label-secondary: rgba(235, 235, 245, 0.6);
   --label-tertiary: rgba(235, 235, 245, 0.3);
 
-  /* Semantic -- identical in both themes */
   --success: #30d158;
   --error: #ff453a;
   --warning: #ff9f0a;
 
-  /* Type */
   --font: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Inter',
     'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 
-  /* Radius scale */
   --radius-standard: 8px;
   --radius-comfortable: 12px;
   --radius-card: 14px;
   --radius-hero: 18px;
   --radius-pill: 999px;
 
-  /* Spacing scale (4pt-based) */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 10px;

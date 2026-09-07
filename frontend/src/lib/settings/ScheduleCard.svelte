@@ -6,7 +6,6 @@
 
   let { config, onSaved } = $props()
 
-  // svelte-ignore state_referenced_locally -- deliberate: seed once, see MosqueCard.svelte
   let time = $state(config.schedule.time)
   let saving = $state(false)
   let error = $state('')
