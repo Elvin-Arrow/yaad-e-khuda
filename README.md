@@ -4,8 +4,6 @@ A small tool that keeps your prayer times where you'll actually see them. It rea
 
 The name means "remembrance of God." That's the whole point of the project, so it felt right.
 
-See `docs/idea.md` for the original design thinking, and `docs/engineering-notes.md` for the "why is it built this way" notes that would otherwise be scattered as comments in the source (including a field by field walkthrough of `config.example.yaml`, which is deliberately left comment-free).
-
 ## What it actually does
 
 Every day, it fetches your mosque's page, pulls out today's Adhan and Iqama times, and syncs them into an iCloud calendar as events with native `VALARM` alarms attached. Because these are real events in a calendar you own (not a subscribed feed), the alarms actually fire. Apple strips alarms from subscribed calendars, so that approach was a dead end from the start.
