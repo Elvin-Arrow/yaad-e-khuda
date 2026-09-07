@@ -58,7 +58,6 @@ def test_onboarding_status_after_both_steps(tmp_path) -> None:
         "has_mosque": True,
         "complete": True,
     }
-    # and it's now a fully loadable strict Config, since setup wrote all the defaults
     config = load_config(path)
     assert config.mosque.slug == "some-mosque"
     assert set(config.prayers.keys()) == set(CANONICAL_PRAYERS)
@@ -71,7 +70,6 @@ def test_merge_raw_does_not_clobber_other_sections(tmp_path) -> None:
     merge_raw(path, {"mosque": {"slug": "some-mosque"}})
 
     raw = read_raw(path)
-    # the icloud section from the first call must still be there
     assert raw["icloud"]["apple_id"] == "a@b.com"
     assert raw["mosque"]["slug"] == "some-mosque"
 
@@ -82,7 +80,6 @@ def test_merge_raw_updates_only_named_keys_within_a_section(tmp_path) -> None:
         path,
         {"icloud": {"apple_id": "a@b.com", "app_specific_password": "x", "calendar_name": "Prayer Reminders"}},
     )
-    # update just the calendar_name; apple_id/password must survive untouched
     merge_raw(path, {"icloud": {"calendar_name": "My Prayers"}})
 
     raw = read_raw(path)

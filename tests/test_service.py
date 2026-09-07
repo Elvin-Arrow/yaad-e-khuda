@@ -23,7 +23,7 @@ def fixture_html() -> str:
 
 @pytest.fixture
 def config_path(tmp_path, monkeypatch) -> str:
-    monkeypatch.chdir(tmp_path)  # so service.LAST_RUN_FILE lands under tmp_path, not the repo
+    monkeypatch.chdir(tmp_path)
     path = "config.yaml"
     merge_raw(
         path,
@@ -94,7 +94,7 @@ def test_run_sync_upserts_all_enabled_prayers(config_path, fixture_html, monkeyp
     result = service.run_sync(config_path)
 
     assert result.ok
-    assert len([c for c in calls if c[0] == "upsert"]) == 5  # all default-enabled
+    assert len([c for c in calls if c[0] == "upsert"]) == 5
     assert len([c for c in calls if c[0] == "delete"]) == 0
 
 
@@ -147,7 +147,7 @@ def test_today_preview_reports_resting_before_first_prayer(
     preview = service.today_preview(config)
 
     assert preview["next_prayer"]["name"] == "fajr"
-    assert preview["next_prayer"]["resting"] is True  # before the day's first enabled prayer
+    assert preview["next_prayer"]["resting"] is True
 
 
 def test_today_preview_reports_progress_between_prayers(
@@ -160,7 +160,6 @@ def test_today_preview_reports_progress_between_prayers(
     class _FixedDateTime(real_datetime):
         @classmethod
         def now(cls, tz=None):
-            # halfway-ish between fajr's iqama (06:02) and dhuhr's iqama (14:03)
             return real_datetime(2026, 1, 1, 10, 0, tzinfo=tz)
 
     monkeypatch.setattr(service, "date", _FixedDate)

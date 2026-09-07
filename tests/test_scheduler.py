@@ -1,8 +1,3 @@
-"""Narrow scheduler tests -- deliberately never start a real
-BackgroundScheduler thread (heavy/flaky for a unit test); only the pure
-HH:MM -> CronTrigger logic and the reschedule() wiring are exercised.
-"""
-
 from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
@@ -43,4 +38,4 @@ def test_reschedule_calls_scheduler_reschedule_job(monkeypatch) -> None:
 
 def test_reschedule_is_noop_when_scheduler_not_started(monkeypatch) -> None:
     monkeypatch.setattr(scheduler, "_scheduler", None)
-    scheduler.reschedule("05:00")  # must not raise
+    scheduler.reschedule("05:00")

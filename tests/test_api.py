@@ -12,9 +12,6 @@ FIXTURE_PATH = os.path.join(os.path.dirname(__file__), "fixtures", "mosque_sampl
 
 
 class _FixedDate(date):
-    """The fixture only has calendar rows for Jan 1-2; freeze "today" to
-    match it, same pattern as test_service.py."""
-
     @classmethod
     def today(cls):
         return date(2026, 1, 1)
@@ -56,7 +53,6 @@ def test_setup_icloud_validates_before_saving(client, config_path, monkeypatch) 
 
     assert resp.status_code == 400
     assert "bad credentials" in resp.json()["detail"]
-    # nothing was saved
     assert onboarding_status(config_path)["has_icloud"] is False
 
 
@@ -142,7 +138,6 @@ def test_update_prayers_persists_and_validates(client, fixture_html, monkeypatch
 
     config = client.get("/api/config").json()
     assert config["prayers"]["fajr"] == {"enabled": False, "minutes_before": 20}
-    # untouched prayers keep their defaults
     assert config["prayers"]["dhuhr"] == {"enabled": True, "minutes_before": 10}
 
 
@@ -155,7 +150,7 @@ def test_update_prayers_rejects_negative_minutes(client, fixture_html, monkeypat
 
     assert resp.status_code == 400
     config = client.get("/api/config").json()
-    assert config["prayers"]["fajr"]["minutes_before"] == 10  # unchanged
+    assert config["prayers"]["fajr"]["minutes_before"] == 10
 
 
 def test_update_schedule_validates_format(client, fixture_html, monkeypatch) -> None:
@@ -185,7 +180,7 @@ def test_update_icloud_revalidates_and_keeps_password_if_omitted(
     resp = client.put("/api/config/icloud", json={"calendar_name": "My Prayers"})
 
     assert resp.status_code == 200
-    assert seen_passwords == ["pw"]  # existing password reused, not clobbered
+    assert seen_passwords == ["pw"]
     assert client.get("/api/config").json()["icloud"]["calendar_name"] == "My Prayers"
 
 

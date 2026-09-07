@@ -8,14 +8,9 @@ from prayer_sync.state import PrayerTime, load_state, save_state
 
 
 def test_save_load_round_trip_preserves_wallclock_and_zone(tmp_path) -> None:
-    """Regression test for the exact pitfall docs/idea.md calls out:
-    datetime.fromisoformat() on a round-tripped UTC-offset string loses
-    the IANA zone name. This must survive save -> load with the zone
-    identity intact, not just the correct UTC instant.
-    """
     path = str(tmp_path / "today.json")
     tz = ZoneInfo("Europe/Paris")
-    day = date(2026, 7, 1)  # July: Europe/Paris is in DST (+02:00)
+    day = date(2026, 7, 1)
 
     prayer_times = {
         "fajr": PrayerTime(
@@ -30,7 +25,6 @@ def test_save_load_round_trip_preserves_wallclock_and_zone(tmp_path) -> None:
     assert loaded.tz_name == "Europe/Paris"
     assert loaded.prayers["fajr"].adhan == prayer_times["fajr"].adhan
     assert loaded.prayers["fajr"].iqama == prayer_times["fajr"].iqama
-    # Not just "same instant" -- the zone name itself must have survived.
     assert loaded.prayers["fajr"].adhan.tzinfo.key == "Europe/Paris"
     assert loaded.prayers["fajr"].iqama.tzinfo.key == "Europe/Paris"
 

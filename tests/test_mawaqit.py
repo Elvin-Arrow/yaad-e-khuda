@@ -79,12 +79,6 @@ def test_today_prayer_times_raises_for_missing_day(conf: dict) -> None:
         today_prayer_times(conf, datetime(2026, 1, 15).date())
 
 
-# Real mosques were found to configure iqamaCalendar per-prayer as either
-# a signed-minutes offset from adhan ("+10") or a fixed absolute "HH:MM"
-# clock time -- docs/idea.md assumed only the offset shape, which turned
-# out not to hold universally (confirmed against a live mosque page where
-# every prayer used the fixed-time shape). This fixture mixes both shapes
-# in one day's row, matching what Mawaqit actually serves.
 _MIXED_SHAPE_HTML = """
 <script>
 var confData = {"timezone":"Europe/London","calendar":[{"1":["04:46","06:18","13:04","16:37","19:39","20:51"]}],"iqamaCalendar":[{"1":["05:15","13:30","18:00","+5","21:15"]}]};
@@ -99,13 +93,10 @@ def test_today_prayer_times_handles_mixed_offset_and_fixed_iqama() -> None:
 
     times = today_prayer_times(conf, today)
 
-    # fixed "HH:MM"-shaped entries: iqama is that literal clock time,
-    # independent of adhan
     assert times["fajr"].iqama == datetime(2026, 1, 1, 5, 15, tzinfo=tz)
     assert times["dhuhr"].iqama == datetime(2026, 1, 1, 13, 30, tzinfo=tz)
     assert times["asr"].iqama == datetime(2026, 1, 1, 18, 0, tzinfo=tz)
     assert times["isha"].iqama == datetime(2026, 1, 1, 21, 15, tzinfo=tz)
 
-    # offset-shaped entry: iqama is adhan + N minutes
     assert times["maghrib"].adhan == datetime(2026, 1, 1, 19, 39, tzinfo=tz)
     assert times["maghrib"].iqama == datetime(2026, 1, 1, 19, 44, tzinfo=tz)
