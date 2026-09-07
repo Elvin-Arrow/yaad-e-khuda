@@ -128,7 +128,7 @@ def test_last_run_status_placeholder_when_never_run(config_path) -> None:
     assert status == {"ran_at": None, "fetch": None, "sync": None, "ok": None}
 
 
-def test_today_preview_reports_resting_before_first_prayer(
+def test_today_preview_reports_progress_before_first_prayer(
     config_path, fixture_html, monkeypatch
 ) -> None:
     monkeypatch.setattr(service, "fetch_html", lambda slug: fixture_html)
@@ -146,8 +146,10 @@ def test_today_preview_reports_resting_before_first_prayer(
     config = load_config(config_path)
     preview = service.today_preview(config)
 
-    assert preview["next_prayer"]["name"] == "fajr"
-    assert preview["next_prayer"]["resting"] is True
+    next_prayer = preview["next_prayer"]
+    assert next_prayer["name"] == "fajr"
+    assert next_prayer["resting"] is False
+    assert 0.0 < next_prayer["progress"] < 1.0
 
 
 def test_today_preview_reports_progress_between_prayers(
@@ -173,3 +175,27 @@ def test_today_preview_reports_progress_between_prayers(
     assert next_prayer["previous_name"] == "fajr"
     assert next_prayer["resting"] is False
     assert 0.0 < next_prayer["progress"] < 1.0
+
+
+def test_today_preview_reports_resting_after_last_prayer(
+    config_path, fixture_html, monkeypatch
+) -> None:
+    monkeypatch.setattr(service, "fetch_html", lambda slug: fixture_html)
+
+    real_datetime = service.datetime
+
+    class _FixedDateTime(real_datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return real_datetime(2026, 1, 1, 23, 0, tzinfo=tz)
+
+    monkeypatch.setattr(service, "date", _FixedDate)
+    monkeypatch.setattr(service, "datetime", _FixedDateTime)
+
+    config = load_config(config_path)
+    preview = service.today_preview(config)
+
+    next_prayer = preview["next_prayer"]
+    assert next_prayer["resting"] is True
+    assert next_prayer["iqama"] is None
+    assert next_prayer["progress"] is None
