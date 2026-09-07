@@ -25,7 +25,14 @@
 
 <div class="onboarding">
   <div class="brand">
-    <div class="mark"></div>
+    <div class="mark">
+      <svg width="30" height="30" viewBox="0 0 48 48" fill="none">
+        <path
+          d="M31 12a13 13 0 1 0 0 24 15.5 15.5 0 0 1 0-24Z"
+          fill="#fff"
+        />
+      </svg>
+    </div>
     <h1>Prayer Reminders</h1>
     <p class="step-label">Step {Math.min(step, 2)} of 2</p>
   </div>
@@ -78,6 +85,9 @@
     border-radius: var(--radius-hero);
     background: radial-gradient(circle at 35% 35%, var(--accent), var(--accent-pressed));
     box-shadow: 0 0 24px rgba(255, 55, 95, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   h1 {
