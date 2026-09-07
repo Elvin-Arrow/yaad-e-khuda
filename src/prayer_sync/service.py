@@ -159,13 +159,17 @@ def _find_next_prayer(
 
     next_name, next_pt = upcoming[0]
     if not passed:
+        midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        span = (next_pt.iqama - midnight).total_seconds()
+        elapsed = (now - midnight).total_seconds()
+        progress = max(0.0, min(1.0, elapsed / span)) if span > 0 else 0.0
         return {
-            "resting": True,
+            "resting": False,
             "name": next_name,
             "iqama": next_pt.iqama.isoformat(),
             "previous_name": None,
             "previous_iqama": None,
-            "progress": None,
+            "progress": progress,
         }
 
     prev_name, prev_pt = passed[-1]
