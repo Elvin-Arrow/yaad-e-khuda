@@ -4,6 +4,19 @@ A small tool that keeps your prayer times where you'll actually see them. It rea
 
 The name means "remembrance of God." That's the whole point of the project, so it felt right.
 
+## Screenshots
+
+Onboarding, two steps, iCloud then mosque:
+
+<p>
+  <img src="docs/images/landing-01.jpg" alt="Onboarding step 1: connecting iCloud with an app-specific password" width="49%" />
+  <img src="docs/images/landing-02.jpg" alt="Onboarding step 2: finding your mosque by its Mawaqit slug" width="49%" />
+</p>
+
+The Home dashboard, once you're set up, today's times, a countdown ring, and a toggle plus lead-time stepper per prayer:
+
+![The Home dashboard, showing today's prayer times, the countdown ring, and per-prayer toggles](docs/images/dashboard-01.jpg)
+
 ## What it actually does
 
 Every day, it fetches your mosque's page, pulls out today's Adhan and Iqama times, and syncs them into an iCloud calendar as events with native `VALARM` alarms attached. Because these are real events in a calendar you own (not a subscribed feed), the alarms actually fire. Apple strips alarms from subscribed calendars, so that approach was a dead end from the start.
