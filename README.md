@@ -86,14 +86,20 @@ Under the hood, the frontend container is Caddy serving the built Svelte files a
    yaad serve
    ```
 
-   Open `http://127.0.0.1:8000`. The first run walks you through two things:
+   This binds to `127.0.0.1:8000` by default. If you want it reachable elsewhere, or on a different port, pass `--host` and `--port` directly to the command, no config file needed for this part:
+
+   ```sh
+   yaad serve --host 0.0.0.0 --port 9000
+   ```
+
+   Open `http://127.0.0.1:8000` (or whatever host and port you chose). The first run walks you through two things:
 
    - Your iCloud Apple ID and an app specific password. Never your real Apple ID password, generate one at appleid.apple.com under Security, App-Specific Passwords. It gets checked against iCloud before anything is saved.
    - Your mosque's Mawaqit slug, the last part of its page URL (`https://mawaqit.net/en/<slug>`). This gets checked by actually fetching the page, so you'll see today's real times right away.
 
    From there you land on Home, showing today's times, a toggle and minutes-before stepper for each prayer, and a card showing sync status.
 
-   The server only binds to `127.0.0.1` by default, since it holds an iCloud app-specific password and isn't meant to be reachable from outside the machine. Pass `--host` and `--port` to `serve` if you want to change that on purpose (Docker Compose already does this for you).
+   The `127.0.0.1` default exists because the server holds an iCloud app-specific password and isn't meant to be reachable from outside the machine, so only override it (as shown above) when you actually mean to expose it (Docker Compose already does this for you, binding `0.0.0.0` inside the container and mapping a host port instead).
 
    If calendar creation fails against iCloud (their CalDAV server has a history of `MKCALENDAR` quirks, see `caldav_sync.get_or_create_calendar`), the error message will tell you what to do. Create a calendar with the exact name from your config once, by hand, in the Calendar app or at icloud.com/calendar. Everything after that just finds it by name.
 
