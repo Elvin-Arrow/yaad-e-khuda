@@ -67,7 +67,10 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: var(--space-9) var(--space-5);
+    padding: calc(var(--space-9) + env(safe-area-inset-top))
+      calc(var(--space-5) + env(safe-area-inset-right))
+      calc(var(--space-9) + env(safe-area-inset-bottom))
+      calc(var(--space-5) + env(safe-area-inset-left));
     gap: var(--space-8);
   }
 
