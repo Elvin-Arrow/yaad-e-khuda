@@ -3,7 +3,7 @@
 	encode gzip zstd
 
 	route {
-		reverse_proxy /api/* backend:8000
+		reverse_proxy /api/* yaad-backend:8000
 
 		try_files {path} /index.html
 		file_server
