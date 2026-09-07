@@ -1,14 +1,7 @@
-# Backend: FastAPI + APScheduler + the `yaad` CLI, API-only.
-# The frontend is a separate image/service -- see frontend/Dockerfile
-# and docker-compose.yml, which wires nginx's /api/ proxy to this
-# container by its compose service name ("backend").
-
 FROM python:3.12-slim
 
 WORKDIR /app
 
-# Dependencies first, source last: a source-only change doesn't bust the
-# (much slower) dependency-install layer.
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
@@ -16,8 +9,6 @@ COPY pyproject.toml ./
 COPY src ./src
 RUN pip install --no-cache-dir --no-deps .
 
-# config.yaml / state / last_run.json live on a mounted volume, not in
-# the image -- see docker-compose.yml's `working_dir: /data` + volume.
 EXPOSE 8000
 ENTRYPOINT ["yaad"]
 CMD ["serve", "--host", "0.0.0.0", "--port", "8000"]
