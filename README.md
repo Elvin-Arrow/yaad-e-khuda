@@ -98,6 +98,8 @@ Once you're set up, opening the app takes you to Home.
   - The Mosque, iCloud, and Schedule cards each need an explicit Save (unlike the Prayers card), because saving re-checks against Mawaqit or iCloud first. On the iCloud card, leave the password field blank to keep the one already saved, only fill it in when you're actually rotating it.
   - The back arrow returns you to Home.
 
+The app is a PWA, so it's installable, "Add to Home Screen" on iOS/Android, the install icon in Chrome/Edge on desktop, and then launches standalone without browser chrome. That relies on a service worker, and browsers only register those over HTTPS (or `localhost`), so install won't be offered while you're serving this over plain `http://` on your LAN, which is what Caddy does out of the box in the Docker Compose setup. Put Caddy behind TLS (a reverse proxy with a real cert, or something like Tailscale/Cloudflare Tunnel) if you want the install prompt to show up there. Everything else about the app works identically either way, this only affects that one step.
+
 ### Running it persistently
 
 If you're not using Docker Compose (which already restarts itself), `yaad serve` needs to stay running for the daily sync to fire. A simple systemd user service does the job.
