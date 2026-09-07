@@ -1,10 +1,3 @@
-"""Write today's prayer times to a dedicated iCloud calendar over CalDAV.
-
-Idempotent by construction: every prayer/day pair maps to one
-deterministic UID, so reruns update the existing VEVENT instead of
-creating a duplicate (docs/idea.md #2 "Idempotency", #3.2, #6).
-"""
-
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
@@ -33,7 +26,7 @@ def connect(apple_id: str, app_specific_password: str) -> caldav.Principal:
             "icloud.app_specific_password in config.yaml (this must be an "
             "app-specific password, not your real Apple ID password)"
         ) from e
-    except Exception as e:  # noqa: BLE001 - surface any transport failure clearly
+    except Exception as e:
         raise CalDavSyncError(f"could not connect to iCloud CalDAV: {e}") from e
 
 
@@ -42,7 +35,7 @@ def get_or_create_calendar(
 ) -> caldav.Calendar:
     try:
         existing = principal.calendars()
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         raise CalDavSyncError(f"could not list iCloud calendars: {e}") from e
 
     for cal in existing:
@@ -51,7 +44,7 @@ def get_or_create_calendar(
 
     try:
         return principal.make_calendar(name=name)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         raise CalDavSyncError(
             f"could not create calendar {name!r} on iCloud ({e}). "
             f"iCloud's CalDAV server is known to be finicky about calendar "
@@ -66,26 +59,15 @@ def deterministic_uid(prayer: str, day: date) -> str:
 
 
 def _find_event_by_uid(calendar: caldav.Calendar, uid: str) -> caldav.Event | None:
-    """Look up an event by UID.
-
-    Deliberately does NOT use calendar.get_event_by_uid()/search(uid=...):
-    those send a server-side REPORT with a UID filter, which iCloud
-    rejects with "412 Precondition Failed" (a known python-caldav/iCloud
-    incompatibility -- iCloud has no compatibility preset in this library
-    as of writing). The plain "list every event" REPORT that
-    get_events() sends has no such problem, and our calendar only ever
-    holds a handful of events (one per enabled prayer), so listing
-    everything and filtering by UID locally is cheap and reliable.
-    """
     try:
         events = calendar.get_events()
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         raise CalDavSyncError(f"could not list events on iCloud calendar: {e}") from e
 
     for event in events:
         try:
             event_uid = str(event.icalendar_component.get("UID", ""))
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             raise CalDavSyncError(f"could not read an event's UID: {e}") from e
         if event_uid == uid:
             return event

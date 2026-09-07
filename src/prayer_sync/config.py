@@ -1,10 +1,3 @@
-"""Config loading.
-
-Re-read fresh on every call to load_config() -- never cache across runs
-(docs/idea.md #3.3), so an edit to config.yaml always takes effect on the
-next fetch/sync without needing a restart of anything.
-"""
-
 from __future__ import annotations
 
 import os
@@ -37,7 +30,7 @@ class ICloudConfig:
     app_specific_password: str
     calendar_name: str
 
-    def __repr__(self) -> str:  # never let the password leak into a log/print
+    def __repr__(self) -> str:
         return (
             f"ICloudConfig(apple_id={self.apple_id!r}, "
             f"app_specific_password='***REDACTED***', "
@@ -53,7 +46,7 @@ class PrayerConfig:
 
 @dataclass(frozen=True)
 class ScheduleConfig:
-    time: str = DEFAULT_SCHEDULE_TIME  # "HH:MM", 24h, local to the server's clock
+    time: str = DEFAULT_SCHEDULE_TIME
 
 
 @dataclass(frozen=True)
@@ -144,19 +137,11 @@ def load_config(path: str) -> Config:
     )
 
 
-# --- Partial-config helpers, used only by the onboarding endpoints in
-# api.py. A fresh install has no config.yaml at all, and step 1 of setup
-# writes only the `icloud` block -- neither state is something the
-# strict load_config() above is meant to tolerate, so onboarding reads
-# and writes the raw YAML dict directly instead. ---------------------
-
-
 def config_exists(path: str) -> bool:
     return os.path.isfile(path)
 
 
 def read_raw(path: str) -> dict:
-    """Read config.yaml as a raw dict, or {} if it doesn't exist yet."""
     if not config_exists(path):
         return {}
     try:
@@ -168,7 +153,6 @@ def read_raw(path: str) -> dict:
 
 
 def write_raw(path: str, data: dict) -> None:
-    """Atomically write a raw config dict, chmod 600 (it holds a secret)."""
     parent = os.path.dirname(path)
     if parent:
         os.makedirs(parent, exist_ok=True)
@@ -181,11 +165,6 @@ def write_raw(path: str, data: dict) -> None:
 
 
 def merge_raw(path: str, updates: dict) -> dict:
-    """Shallow-merge `updates` into the existing raw config one section
-    at a time (e.g. updates={"icloud": {...}} only touches the `icloud`
-    key, leaving `mosque`/`prayers`/etc. untouched), write it back, and
-    return the merged dict.
-    """
     raw = read_raw(path)
     for section, value in updates.items():
         if isinstance(value, dict) and isinstance(raw.get(section), dict):

@@ -1,10 +1,3 @@
-"""Command-line entry points: `yaad fetch|sync|serve`.
-
-Registered as the `yaad` console script via pyproject.toml's
-[project.scripts]; `python -m prayer_sync ...` still works too (same
-main(), see __main__.py), it's just not the documented name anymore.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -40,8 +33,6 @@ def cmd_sync(config_path: str) -> int:
 
 
 def cmd_serve(config_path: str, host: str, port: int) -> int:
-    # Imported lazily: fastapi/uvicorn/apscheduler are only needed for
-    # `serve`, not for the plain `fetch`/`sync` CLI path.
     import uvicorn
 
     from . import scheduler as scheduler_module
@@ -88,7 +79,7 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_serve(args.config, args.host, args.port)
 
     parser.error(f"unknown command {args.command!r}")
-    return 2  # unreachable, parser.error exits
+    return 2
 
 
 if __name__ == "__main__":

@@ -1,13 +1,3 @@
-"""Fetch and parse a mosque's Mawaqit page.
-
-Deliberately does NOT depend on the `py-mawaqit`/`mawaqit` PyPI packages:
-one pulls in requests_html + pyppeteer (a headless Chromium downloaded at
-runtime) just to render a page whose confData is already present in the
-plain server-rendered HTML; the other requires a separate MAWAQIT account
-login. Verified directly against a real mosque page that a plain GET is
-enough -- see docs/idea.md and the plan for the confirmation.
-"""
-
 from __future__ import annotations
 
 import json
@@ -21,29 +11,14 @@ from .state import PrayerTime
 
 CANONICAL_PRAYERS = ("fajr", "dhuhr", "asr", "maghrib", "isha")
 
-# Index into confData["calendar"][month-1][str(day)], a 6-element list of
-# "HH:MM" strings: [fajr, shuruq, dhuhr, asr, maghrib, isha]. Shuruq
-# (index 1) is not a prayer and is skipped, per docs/idea.md #3.1.
 _ADHAN_INDEX = {"fajr": 0, "dhuhr": 2, "asr": 3, "maghrib": 4, "isha": 5}
 
-# Index into confData["iqamaCalendar"][month-1][str(day)], a 5-element
-# list, one per CANONICAL_PRAYERS entry in that same order. Each mosque
-# configures, per prayer, whether Mawaqit reports iqama as a fixed clock
-# time or as an offset from adhan -- the array holds a mix of both shapes
-# depending on that mosque's own setup:
-#   - a signed-minutes-offset string, e.g. "+0", "+15", "-5"
-#   - an absolute "HH:MM" clock time, e.g. "05:15" (common for prayers
-#     with a fixed iqama that doesn't track adhan's daily drift)
-# Confirmed against two real mosques exhibiting each shape -- see
-# _resolve_iqama(). docs/idea.md assumes the offset-only shape; that
-# turned out not to hold universally.
 _IQAMA_INDEX = {name: i for i, name in enumerate(CANONICAL_PRAYERS)}
 
 _CONF_DATA_MARKER = "confData = "
 
 
 def fetch_html(slug_or_url: str) -> str:
-    """Fetch the mosque's Mawaqit page. Raises MawaqitError on any failure."""
     url = slug_or_url
     if not url.startswith("http"):
         url = f"https://mawaqit.net/en/{slug_or_url}"
@@ -60,12 +35,6 @@ def fetch_html(slug_or_url: str) -> str:
 
 
 def extract_conf_data(html: str) -> dict:
-    """Extract and parse the `confData` JSON blob embedded in the page.
-
-    Finds the `confData = ` marker, then brace-matches from the following
-    `{` to its balanced closing `}` -- robust to the surrounding JS
-    formatting, unlike matching on a fixed trailing string.
-    """
     marker_index = html.find(_CONF_DATA_MARKER)
     if marker_index == -1:
         raise MawaqitError(
@@ -120,15 +89,6 @@ def extract_conf_data(html: str) -> dict:
 
 
 def _resolve_iqama(prayer: str, raw_value: str, adhan_dt: datetime) -> datetime:
-    """Resolve one iqamaCalendar entry to an absolute datetime.
-
-    See the _IQAMA_INDEX comment: the value is either a signed
-    minutes-offset from adhan, or an absolute "HH:MM" clock time. An
-    "HH:MM" fixed iqama is assumed to fall on the same calendar day as
-    adhan (no midnight rollover) -- true for all five prayers in
-    practice, since none of them are ever configured with a fixed iqama
-    that lands after midnight relative to their own adhan.
-    """
     if not isinstance(raw_value, str):
         raise MawaqitError(f"unparseable iqama value for {prayer}: {raw_value!r}")
 
@@ -153,7 +113,6 @@ def _resolve_iqama(prayer: str, raw_value: str, adhan_dt: datetime) -> datetime:
 def today_prayer_times(
     conf: dict, today: date, tz_override: str | None = None
 ) -> dict[str, PrayerTime]:
-    """Compute today's adhan+iqama datetimes for every canonical prayer."""
     tz_name = tz_override or conf.get("timezone")
     if not tz_name:
         raise MawaqitError(
@@ -162,7 +121,7 @@ def today_prayer_times(
         )
     try:
         tz = ZoneInfo(tz_name)
-    except Exception as e:  # noqa: BLE001 - zoneinfo raises various error types
+    except Exception as e:
         raise MawaqitError(f"invalid IANA timezone {tz_name!r}: {e}") from e
 
     month_idx = today.month - 1

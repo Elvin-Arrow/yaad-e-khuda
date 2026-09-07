@@ -1,12 +1,3 @@
-"""The actual fetch/sync business logic, shared by the CLI, the API, and
-the in-process scheduler.
-
-Deliberately has no logging or sys.exit side effects (unlike the old
-cli.py, which owned both) -- callers get a plain result back and decide
-what to do with it: cli.py logs it and maps it to an exit code, api.py
-turns it into a JSON response, scheduler.py writes it to last_run.json.
-"""
-
 from __future__ import annotations
 
 import json
@@ -42,7 +33,7 @@ def run_fetch(config_path: str) -> RunResult:
         save_state(config.state_file, today, tz_name, prayer_times)
     except PrayerSyncError as e:
         return RunResult(ok=False, message=f"fetch failed: {e}")
-    except Exception as e:  # noqa: BLE001 - never let an unanticipated error propagate raw
+    except Exception as e:
         return RunResult(ok=False, message=f"fetch failed with an unexpected error: {e}")
 
     return RunResult(
@@ -75,7 +66,7 @@ def run_sync(config_path: str) -> RunResult:
                 caldav_sync.delete_event_if_exists(calendar, name, today)
     except PrayerSyncError as e:
         return RunResult(ok=False, message=f"sync failed: {e}")
-    except Exception as e:  # noqa: BLE001 - never let an unanticipated error propagate raw
+    except Exception as e:
         return RunResult(ok=False, message=f"sync failed with an unexpected error: {e}")
 
     return RunResult(
@@ -85,11 +76,6 @@ def run_sync(config_path: str) -> RunResult:
 
 
 def run_daily(config_path: str) -> dict:
-    """Fetch, then sync only if the fetch succeeded -- mirrors the `&&`
-    chaining the cron setup used, now owned by the scheduler/API instead.
-    Always records the outcome to LAST_RUN_FILE so the UI has something
-    to show even for a run nobody was watching live.
-    """
     fetch_result = run_fetch(config_path)
     sync_result: RunResult | None = None
     if fetch_result.ok:
@@ -125,10 +111,6 @@ def last_run_status() -> dict:
 
 
 def today_preview(config: Config) -> dict:
-    """Live snapshot of today's prayer times for display in the UI --
-    fetched fresh, independent of state.json (which exists purely to
-    hand today's numbers from the fetcher to the calendar sync).
-    """
     today = date.today()
     html = fetch_html(config.mosque.slug)
     conf = extract_conf_data(html)
@@ -154,12 +136,6 @@ def today_preview(config: Config) -> dict:
 def _find_next_prayer(
     config: Config, prayer_times: dict[str, PrayerTime], now: datetime
 ) -> dict | None:
-    """Which enabled prayer is next, and which was previous -- computed
-    within today only (see the plan's noted scope cut: no fetching
-    tomorrow's row). Returns None if no prayer is enabled at all, or a
-    dict with a "resting" state if we're before the first or after the
-    last enabled prayer of the day.
-    """
     enabled_in_order = [
         (name, prayer_times[name])
         for name in CANONICAL_PRAYERS

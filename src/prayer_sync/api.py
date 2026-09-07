@@ -1,13 +1,3 @@
-"""FastAPI backend for the Settings UI.
-
-`create_app(config_path)` is a factory rather than a module-level `app`
-singleton so tests (and `cli.cmd_serve`) can point it at an arbitrary
-config.yaml path -- see docs/idea.md's "re-read fresh, no caching"
-requirement, which this inherits by simply calling load_config()/
-read_raw() fresh inside every request handler, same as the CLI always
-did.
-"""
-
 from __future__ import annotations
 
 from datetime import date
@@ -81,8 +71,6 @@ def create_app(config_path: str = "config.yaml") -> FastAPI:
     async def _handle_prayer_sync_error(_request, exc: PrayerSyncError):
         return JSONResponse(status_code=400, content={"detail": str(exc)})
 
-    # --- Onboarding -----------------------------------------------------
-
     @app.get("/api/setup/status")
     def setup_status():
         return onboarding_status(config_path)
@@ -122,8 +110,6 @@ def create_app(config_path: str = "config.yaml") -> FastAPI:
             "timezone": conf.get("timezone"),
             "preview": _prayer_times_response(prayer_times),
         }
-
-    # --- Settings (config assumed complete from here down) ---------------
 
     @app.get("/api/config")
     def get_config():
@@ -176,7 +162,7 @@ def create_app(config_path: str = "config.yaml") -> FastAPI:
         )
 
         if slug != config.mosque.slug:
-            extract_conf_data(fetch_html(slug))  # raises MawaqitError if bad
+            extract_conf_data(fetch_html(slug))
 
         merge_raw(
             config_path,
@@ -212,12 +198,10 @@ def create_app(config_path: str = "config.yaml") -> FastAPI:
 
         merge_raw(config_path, {"schedule": {"time": body.time}})
 
-        from . import scheduler  # lazy: avoids importing apscheduler under plain CLI use
+        from . import scheduler
 
         scheduler.reschedule(body.time)
         return {"ok": True}
-
-    # --- Live data / actions ---------------------------------------------
 
     @app.get("/api/prayer-times/today")
     def prayer_times_today():
@@ -231,8 +215,6 @@ def create_app(config_path: str = "config.yaml") -> FastAPI:
     @app.post("/api/sync/run")
     def sync_run():
         return service.run_daily(config_path)
-
-    # --- Serve the built Svelte app in production ------------------------
 
     frontend_dist = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
     if frontend_dist.is_dir():

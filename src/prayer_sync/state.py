@@ -1,17 +1,3 @@
-"""Local state: today's computed prayer times, written by the fetcher and
-read by the calendar sync.
-
-Timezone-preservation fix (docs/idea.md #4): a tz-aware datetime's
-isoformat() serializes to a UTC *offset* (e.g. "+01:00"), not the IANA
-*zone name* ("Europe/Paris"). Round-tripping that through
-datetime.fromisoformat() gives back a fixed-offset tzinfo with no zone
-identity -- it looks tz-aware but has silently lost the zone. So we never
-store an offset-bearing timestamp: we store the naive wall-clock time
-plus the zone name once, and re-attach zoneinfo(zone_name) explicitly on
-load. There is no path through this file where a round-tripped offset
-string is the only record of the zone.
-"""
-
 from __future__ import annotations
 
 import json
@@ -63,7 +49,7 @@ def save_state(
     with open(tmp_path, "w", encoding="utf-8") as f:
         json.dump(payload, f, indent=2)
         f.write("\n")
-    os.replace(tmp_path, path)  # atomic: a crash here can't corrupt/truncate `path`
+    os.replace(tmp_path, path)
 
 
 def load_state(path: str, expected_date: date) -> State:
