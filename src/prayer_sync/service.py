@@ -125,6 +125,7 @@ def today_preview(config: Config) -> dict:
     return {
         "date": today.isoformat(),
         "timezone": tz_name,
+        "mosque_name": conf.get("name"),
         "prayers": {
             name: {"adhan": pt.adhan.isoformat(), "iqama": pt.iqama.isoformat()}
             for name, pt in prayer_times.items()

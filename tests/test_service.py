@@ -128,6 +128,27 @@ def test_last_run_status_placeholder_when_never_run(config_path) -> None:
     assert status == {"ran_at": None, "fetch": None, "sync": None, "ok": None}
 
 
+def test_today_preview_reports_mosque_name(
+    config_path, fixture_html, monkeypatch
+) -> None:
+    monkeypatch.setattr(service, "fetch_html", lambda slug: fixture_html)
+
+    real_datetime = service.datetime
+
+    class _FixedDateTime(real_datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return real_datetime(2026, 1, 1, 5, 0, tzinfo=tz)
+
+    monkeypatch.setattr(service, "date", _FixedDate)
+    monkeypatch.setattr(service, "datetime", _FixedDateTime)
+
+    config = load_config(config_path)
+    preview = service.today_preview(config)
+
+    assert preview["mosque_name"] == "Test Mosque"
+
+
 def test_today_preview_reports_progress_before_first_prayer(
     config_path, fixture_html, monkeypatch
 ) -> None:
