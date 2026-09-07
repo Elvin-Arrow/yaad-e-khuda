@@ -60,7 +60,7 @@ export default defineConfig({
     proxy: {
       // python -m prayer_sync serve runs the API on :8000 in dev; the
       // browser only ever talks to Vite's :5173, so no CORS is needed.
-      '/api': 'http://127.0.0.1:8091',
+      '/api': 'http://127.0.0.1:8000',
     },
   },
 })
