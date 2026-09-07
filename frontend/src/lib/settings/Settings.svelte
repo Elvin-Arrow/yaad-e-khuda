@@ -43,7 +43,10 @@
   .shell {
     max-width: 480px;
     margin: 0 auto;
-    padding: var(--space-8) var(--space-5) var(--space-9);
+    padding: calc(var(--space-8) + env(safe-area-inset-top))
+      calc(var(--space-5) + env(safe-area-inset-right))
+      calc(var(--space-9) + env(safe-area-inset-bottom))
+      calc(var(--space-5) + env(safe-area-inset-left));
   }
 
   .loading,
