@@ -1,5 +1,5 @@
 services:
-  backend:
+  yaad-backend:
     build:
       context: .
       dockerfile: Dockerfile.backend
@@ -10,11 +10,11 @@ services:
       - "8100:8000"
     restart: unless-stopped
 
-  frontend:
+  yaad-frontend:
     build:
       context: ./frontend
     ports:
       - "8180:80"
     depends_on:
-      - backend
+      - yaad-backend
     restart: unless-stopped
