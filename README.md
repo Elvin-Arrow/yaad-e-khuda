@@ -1,6 +1,6 @@
 # Yaad e Khuda
 
-A small tool that keeps your prayer times where you'll actually see them. It reads today's Iqama times off your mosque's Mawaqit page and writes them into a dedicated calendar on your iCloud account, as real events with real alarms. No extra app to check, no notification you have to remember exists. The reminder just shows up in the Calendar app you already look at.
+A small tool that keeps your prayer times where you'll actually see them. It reads today's Iqama times off your mosque's Mawaqit page and writes them into a dedicated calendar on your iCloud account, your Google account, or both, as real events with real alarms. No extra app to check, no notification you have to remember exists. The reminder just shows up in the Calendar app you already look at.
 
 The name means "remembrance of God." That's the whole point of the project, so it felt right.
 
@@ -19,7 +19,7 @@ The Home dashboard, once you're set up, today's times, a countdown ring, and a t
 
 ## What it actually does
 
-Every day, it fetches your mosque's page, pulls out today's Adhan and Iqama times, and syncs them into an iCloud calendar as events with native `VALARM` alarms attached. Because these are real events in a calendar you own (not a subscribed feed), the alarms actually fire. Apple strips alarms from subscribed calendars, so that approach was a dead end from the start.
+Every day, it fetches your mosque's page, pulls out today's Adhan and Iqama times, and syncs them into a calendar you own, iCloud, Google, or both at once, as events with native alarms/reminders attached. Because these are real events in a calendar you own (not a subscribed feed), the alarms actually fire. Both Apple and Google strip alarms from subscribed/shared calendars, so that approach was a dead end from the start.
 
 The CLI is called `yaad`, installed as a console script. You can run it three ways depending on how much infrastructure you want around it.
 
@@ -92,16 +92,27 @@ Under the hood, the frontend container is Caddy serving the built Svelte files a
    yaad serve --host 0.0.0.0 --port 9000
    ```
 
-   Open `http://127.0.0.1:8000` (or whatever host and port you chose). The first run walks you through two things:
+   Open `http://127.0.0.1:8000` (or whatever host and port you chose). The first run walks you through connecting a calendar, then your mosque:
 
-   - Your iCloud Apple ID and an app specific password. Never your real Apple ID password, generate one at appleid.apple.com under Security, App-Specific Passwords. It gets checked against iCloud before anything is saved.
-   - Your mosque's Mawaqit slug, the last part of its page URL (`https://mawaqit.net/en/<slug>`). This gets checked by actually fetching the page, so you'll see today's real times right away.
+   - **Calendar.** Connect iCloud, Google, or both, whatever you check off here gets synced every run. For iCloud, an app specific password. Never your real Apple ID password, generate one at appleid.apple.com under Security, App-Specific Passwords. It gets checked against iCloud before anything is saved. For Google, see "Connecting Google Calendar" below, it needs a one-time Google Cloud Console setup before you can click Connect.
+   - **Mosque.** Your mosque's Mawaqit slug, the last part of its page URL (`https://mawaqit.net/en/<slug>`). This gets checked by actually fetching the page, so you'll see today's real times right away.
 
    From there you land on Home, showing today's times, a toggle and minutes-before stepper for each prayer, and a card showing sync status.
 
-   The `127.0.0.1` default exists because the server holds an iCloud app-specific password and isn't meant to be reachable from outside the machine, so only override it (as shown above) when you actually mean to expose it (Docker Compose already does this for you, binding `0.0.0.0` inside the container and mapping a host port instead).
+   The `127.0.0.1` default exists because the server holds credentials for whichever calendar(s) you connect and isn't meant to be reachable from outside the machine, so only override it (as shown above) when you actually mean to expose it (Docker Compose already does this for you, binding `0.0.0.0` inside the container and mapping a host port instead).
 
    If calendar creation fails against iCloud (their CalDAV server has a history of `MKCALENDAR` quirks, see `caldav_sync.get_or_create_calendar`), the error message will tell you what to do. Create a calendar with the exact name from your config once, by hand, in the Calendar app or at icloud.com/calendar. Everything after that just finds it by name.
+
+### Connecting Google Calendar
+
+Google's Calendar API needs an OAuth2 client, there's no app-specific-password shortcut like iCloud's. One-time setup, done once per person running this:
+
+1. Create a project at console.cloud.google.com (or reuse one), then enable the **Google Calendar API** under APIs & Services.
+2. Under APIs & Services -> Credentials, create an **OAuth client ID** of type **Web application**.
+3. Add an **Authorized redirect URI** matching however you're running the app, plus `/api/google/oauth/callback`. For example `http://localhost:8000/api/google/oauth/callback` (bare `yaad serve`), `http://localhost:8180/api/google/oauth/callback` (Docker Compose), or your real HTTPS domain if you're behind a reverse proxy. You can register more than one URI on the same client if you use this in more than one way.
+4. Copy the **Client ID** and **Client Secret** into the app, either the Google card during onboarding or Settings later, then click **Connect Google Calendar**. You'll land on Google's consent screen, approve it, and you're redirected straight back into the app, connected.
+
+The app derives its own redirect URI from whatever address you're visiting it at, so it works whether you're on localhost, Docker Compose, or a domain, as long as that exact URI is registered on the OAuth client in step 3.
 
 4. As long as `yaad serve` keeps running, it fetches and syncs itself once a day, at whatever time you set on the Settings page's Schedule card (03:00 by default, editable without restarting). Keep the server running for this to happen without you. See "Running it persistently" below.
 
@@ -165,7 +176,7 @@ Skip npm, `serve`, and Docker entirely and drive it by hand or via cron instead.
    chmod 600 config.yaml
    ```
 
-   Edit it directly: mosque slug, iCloud credentials and calendar name, and each prayer's `enabled` and `minutes_before`. The `schedule` section doesn't matter here; it's only read by `serve`.
+   Edit it directly: mosque slug, iCloud credentials and calendar name, and each prayer's `enabled` and `minutes_before`. The `schedule` section doesn't matter here; it's only read by `serve`. Google Calendar's `refresh_token` can only be filled in through the OAuth flow in the web UI, so if you want Google alongside (or instead of) iCloud on a cron-driven setup, run `yaad serve` once, connect Google Calendar from Settings, then go back to cron; `client_id`/`client_secret`/`refresh_token` all live in `config.yaml` either way.
 
 4. Run it once by hand to make sure it works end to end.
 
@@ -206,6 +217,7 @@ src/prayer_sync/
 ├── mawaqit.py        # fetch mosque page, extract confData, compute today's adhan/iqama
 ├── state.py          # local JSON state: today's computed times (atomic write)
 ├── caldav_sync.py     # iCloud CalDAV: find/create calendar, upsert/delete events
+├── google_calendar_sync.py  # Google Calendar API: OAuth, find/create calendar, upsert/delete events
 ├── service.py        # fetch/sync business logic shared by the CLI, API, and scheduler
 ├── scheduler.py       # in-process daily scheduler (APScheduler) started by `serve`
 ├── api.py            # FastAPI app: onboarding, settings, live prayer times, sync status/trigger
@@ -219,6 +231,6 @@ frontend/
     ├── api.js                     # fetch wrappers for the backend
     ├── theme.css, theme.js        # design tokens (true-black canvas, Move-pink accent) + light/dark toggle
     ├── components/                # Card, Button, Toggle, Stepper, TextField, Toast, NextPrayerRing
-    ├── onboarding/                 # 2-step wizard: iCloud, then mosque
+    ├── onboarding/                 # 2-step wizard: connect calendar(s) (iCloud and/or Google), then mosque
     └── settings/                  # Settings.svelte (shell) -> HomePage.svelte / SettingsPage.svelte
 ```
