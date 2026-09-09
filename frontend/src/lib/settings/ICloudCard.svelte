@@ -7,8 +7,8 @@
 
   let { config, onSaved } = $props()
 
-  let appleId = $state(config.icloud.apple_id)
-  let calendarName = $state(config.icloud.calendar_name)
+  let appleId = $state(config.icloud?.apple_id || '')
+  let calendarName = $state(config.icloud?.calendar_name || 'Prayer Reminders')
   let password = $state('')
   let saving = $state(false)
   let error = $state('')
@@ -37,19 +37,26 @@
 </script>
 
 <Card>
-  <h2>iCloud</h2>
-  <TextField label="Apple ID" type="email" bind:value={appleId} />
+  <div class="card-header">
+    <h2>iCloud</h2>
+    {#if config.icloud}<span class="status saved">Connected</span>{/if}
+  </div>
+  <TextField label="Apple ID" type="email" bind:value={appleId} placeholder="you@icloud.com" />
   <TextField label="Calendar name" bind:value={calendarName} />
   <TextField
     label="App-Specific Password"
     type="password"
     bind:value={password}
-    placeholder="Leave blank to keep the current one"
+    placeholder={config.icloud ? 'Leave blank to keep the current one' : 'xxxx-xxxx-xxxx-xxxx'}
     hasError={!!error}
   />
   {#if error}<Toast kind="error">{error}</Toast>{/if}
   {#if success}<Toast kind="success">Saved</Toast>{/if}
-  <Button variant="filled" disabled={saving} onclick={save}>
-    {saving ? 'Checking…' : 'Save'}
+  <Button
+    variant="filled"
+    disabled={saving || !appleId || (!password && !config.icloud)}
+    onclick={save}
+  >
+    {saving ? 'Checking…' : config.icloud ? 'Save' : 'Connect'}
   </Button>
 </Card>

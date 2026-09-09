@@ -3,11 +3,13 @@
   import { api } from '../api.js'
   import HomePage from './HomePage.svelte'
   import SettingsPage from './SettingsPage.svelte'
+  import Toast from '../components/Toast.svelte'
 
   let config = $state(null)
   let todayData = $state(null)
   let loadErr = $state('')
   let page = $state('home')
+  let googleConnectedToast = $state(false)
 
   async function loadAll() {
     try {
@@ -21,6 +23,17 @@
   }
 
   onMount(() => {
+    if (new URLSearchParams(window.location.search).get('google') === 'connected') {
+      page = 'settings'
+      googleConnectedToast = true
+      const url = new URL(window.location.href)
+      url.searchParams.delete('google')
+      window.history.replaceState({}, '', url)
+      setTimeout(() => {
+        googleConnectedToast = false
+      }, 2500)
+    }
+
     loadAll()
     const id = setInterval(loadAll, 60_000)
     return () => clearInterval(id)
@@ -33,6 +46,7 @@
   {:else if !config || !todayData}
     <p class="loading">Loading…</p>
   {:else if page === 'settings'}
+    {#if googleConnectedToast}<Toast kind="success">Google Calendar connected</Toast>{/if}
     <SettingsPage {config} onBack={() => (page = 'home')} onSaved={loadAll} />
   {:else}
     <HomePage {config} {todayData} onOpenSettings={() => (page = 'settings')} onSaved={loadAll} />

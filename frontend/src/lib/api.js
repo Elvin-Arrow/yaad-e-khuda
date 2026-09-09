@@ -43,6 +43,9 @@ export const api = {
   updateMosque: (body) => request('PUT', '/config/mosque', body),
   updatePrayers: (body) => request('PUT', '/config/prayers', body),
   updateSchedule: (body) => request('PUT', '/config/schedule', body),
+  updateGoogle: (body) => request('PUT', '/config/google', body),
+  disconnectGoogle: () => request('POST', '/config/google/disconnect'),
+  googleOauthStartUrl: () => `${BASE}/google/oauth/start`,
 
   todayPrayerTimes: () => request('GET', '/prayer-times/today'),
   syncStatus: () => request('GET', '/sync/status'),

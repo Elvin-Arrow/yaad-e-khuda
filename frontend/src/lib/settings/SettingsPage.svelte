@@ -2,6 +2,7 @@
   import AppearanceCard from './AppearanceCard.svelte'
   import MosqueCard from './MosqueCard.svelte'
   import ICloudCard from './ICloudCard.svelte'
+  import GoogleCard from './GoogleCard.svelte'
   import ScheduleCard from './ScheduleCard.svelte'
 
   let { config, onBack, onSaved } = $props()
@@ -28,6 +29,7 @@
     <AppearanceCard />
     <MosqueCard {config} {onSaved} />
     <ICloudCard {config} {onSaved} />
+    <GoogleCard {config} {onSaved} />
     <ScheduleCard {config} {onSaved} />
   </div>
 </div>

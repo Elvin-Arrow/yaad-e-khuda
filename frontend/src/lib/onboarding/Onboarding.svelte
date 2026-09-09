@@ -1,5 +1,5 @@
 <script>
-  import StepIcloud from './StepIcloud.svelte'
+  import StepCalendars from './StepCalendars.svelte'
   import StepMosque from './StepMosque.svelte'
   import Card from '../components/Card.svelte'
 
@@ -8,7 +8,7 @@
   let step = $state(1)
   let preview = $state(null)
 
-  function handleIcloudDone() {
+  function handleCalendarsDone() {
     step = 2
   }
 
@@ -39,7 +39,7 @@
 
   <div class="content">
     {#if step === 1}
-      <StepIcloud onDone={handleIcloudDone} />
+      <StepCalendars onDone={handleCalendarsDone} />
     {:else if step === 2}
       <StepMosque onDone={handleMosqueDone} />
     {:else}
