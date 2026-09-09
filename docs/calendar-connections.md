@@ -65,6 +65,17 @@ examples are:
 If you use more than one address, register each corresponding redirect URI on
 the same OAuth client.
 
+If HTTPS ends at a reverse proxy, set `YAAD_PUBLIC_BASE_URL` on Yaad's backend
+to the public HTTPS origin, without the callback path. For example:
+
+```yaml
+environment:
+  YAAD_PUBLIC_BASE_URL: https://yaad.example.com
+```
+
+This ensures Yaad asks Google to return to the HTTPS address, rather than the
+plain HTTP connection between the proxy and Yaad.
+
 ### 2. Create Google Cloud credentials
 
 1. Go to the [Google Cloud console](https://console.cloud.google.com/) and
