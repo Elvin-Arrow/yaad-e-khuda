@@ -15,6 +15,8 @@ dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
     "apscheduler>=3.10",
+    "google-api-python-client>=2.140",
+    "google-auth>=2.34",
 ]
 
 [project.scripts]
