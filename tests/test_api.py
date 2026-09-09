@@ -259,6 +259,18 @@ def test_google_oauth_start_redirects_with_derived_redirect_uri(client) -> None:
     assert query["redirect_uri"][0] == "http://testserver/api/google/oauth/callback"
 
 
+def test_google_oauth_start_uses_configured_public_base_url(client, monkeypatch) -> None:
+    monkeypatch.setenv("YAAD_PUBLIC_BASE_URL", "https://yaad.example.test/")
+    client.put("/api/config/google", json={"client_id": "id-123", "client_secret": "secret-456"})
+
+    resp = client.get("/api/google/oauth/start", follow_redirects=False)
+
+    from urllib.parse import parse_qs, urlparse
+
+    query = parse_qs(urlparse(resp.headers["location"]).query)
+    assert query["redirect_uri"][0] == "https://yaad.example.test/api/google/oauth/callback"
+
+
 def test_google_oauth_callback_rejects_unknown_state(client) -> None:
     resp = client.get(
         "/api/google/oauth/callback", params={"code": "abc", "state": "not-issued"}
