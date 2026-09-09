@@ -11,6 +11,7 @@ from .errors import ConfigError
 CANONICAL_PRAYERS = ("fajr", "dhuhr", "asr", "maghrib", "isha")
 
 DEFAULT_CALENDAR_NAME = "Prayer Reminders"
+DEFAULT_GOOGLE_CALENDAR_NAME = "Prayer Reminders"
 DEFAULT_MINUTES_BEFORE = 10
 DEFAULT_STATE_FILE = "state/today.json"
 DEFAULT_SCHEDULE_TIME = "03:00"
@@ -39,6 +40,24 @@ class ICloudConfig:
 
 
 @dataclass(frozen=True)
+class GoogleConfig:
+    calendar_name: str
+    client_id: str | None = None
+    client_secret: str | None = None
+    refresh_token: str | None = None
+    enabled: bool = True
+
+    def __repr__(self) -> str:
+        return (
+            f"GoogleConfig(client_id={self.client_id!r}, "
+            f"client_secret='***REDACTED***', "
+            f"refresh_token='***REDACTED***', "
+            f"calendar_name={self.calendar_name!r}, "
+            f"enabled={self.enabled!r})"
+        )
+
+
+@dataclass(frozen=True)
 class PrayerConfig:
     enabled: bool
     minutes_before: int
@@ -52,7 +71,8 @@ class ScheduleConfig:
 @dataclass(frozen=True)
 class Config:
     mosque: MosqueConfig
-    icloud: ICloudConfig
+    icloud: ICloudConfig | None = None
+    google: GoogleConfig | None = None
     prayers: dict[str, PrayerConfig] = field(default_factory=dict)
     state_file: str = DEFAULT_STATE_FILE
     schedule: ScheduleConfig = field(default_factory=ScheduleConfig)
@@ -90,13 +110,28 @@ def load_config(path: str) -> Config:
     )
 
     icloud_raw = raw.get("icloud") or {}
-    icloud = ICloudConfig(
-        apple_id=str(_require(icloud_raw, "apple_id", "icloud")),
-        app_specific_password=str(
-            _require(icloud_raw, "app_specific_password", "icloud")
-        ),
-        calendar_name=str(_require(icloud_raw, "calendar_name", "icloud")),
-    )
+    icloud: ICloudConfig | None = None
+    if icloud_raw:
+        icloud = ICloudConfig(
+            apple_id=str(_require(icloud_raw, "apple_id", "icloud")),
+            app_specific_password=str(
+                _require(icloud_raw, "app_specific_password", "icloud")
+            ),
+            calendar_name=str(_require(icloud_raw, "calendar_name", "icloud")),
+        )
+
+    google_raw = raw.get("google") or {}
+    google: GoogleConfig | None = None
+    if google_raw:
+        google = GoogleConfig(
+            calendar_name=str(
+                google_raw.get("calendar_name") or DEFAULT_GOOGLE_CALENDAR_NAME
+            ),
+            client_id=google_raw.get("client_id"),
+            client_secret=google_raw.get("client_secret"),
+            refresh_token=google_raw.get("refresh_token"),
+            enabled=bool(google_raw.get("enabled", True)),
+        )
 
     prayers_raw = raw.get("prayers") or {}
     prayers: dict[str, PrayerConfig] = {}
@@ -131,6 +166,7 @@ def load_config(path: str) -> Config:
     return Config(
         mosque=mosque,
         icloud=icloud,
+        google=google,
         prayers=prayers,
         state_file=state_file,
         schedule=schedule,
@@ -178,15 +214,18 @@ def merge_raw(path: str, updates: dict) -> dict:
 def onboarding_status(path: str) -> dict:
     raw = read_raw(path)
     icloud = raw.get("icloud") or {}
+    google = raw.get("google") or {}
     mosque = raw.get("mosque") or {}
     has_icloud = bool(icloud.get("apple_id")) and bool(
         icloud.get("app_specific_password")
     )
+    has_google = bool(google.get("refresh_token"))
     has_mosque = bool(mosque.get("slug"))
     return {
         "has_icloud": has_icloud,
+        "has_google": has_google,
         "has_mosque": has_mosque,
-        "complete": has_icloud and has_mosque,
+        "complete": (has_icloud or has_google) and has_mosque,
     }
 
 

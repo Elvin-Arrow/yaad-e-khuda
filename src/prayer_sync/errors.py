@@ -16,3 +16,7 @@ class StateError(PrayerSyncError):
 
 class CalDavSyncError(PrayerSyncError):
     pass
+
+
+class GoogleCalendarSyncError(PrayerSyncError):
+    pass

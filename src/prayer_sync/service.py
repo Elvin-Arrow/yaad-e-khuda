@@ -5,11 +5,11 @@ import os
 from dataclasses import asdict, dataclass
 from datetime import date, datetime, timezone
 
-from . import caldav_sync
+from . import caldav_sync, google_calendar_sync
 from .config import CANONICAL_PRAYERS, Config, load_config
 from .errors import PrayerSyncError
 from .mawaqit import extract_conf_data, fetch_html, today_prayer_times
-from .state import PrayerTime, load_state, save_state
+from .state import PrayerTime, State, load_state, save_state
 
 LAST_RUN_FILE = "state/last_run.json"
 
@@ -42,12 +42,8 @@ def run_fetch(config_path: str) -> RunResult:
     )
 
 
-def run_sync(config_path: str) -> RunResult:
+def _sync_icloud(config: Config, today: date, state: State) -> RunResult:
     try:
-        config = load_config(config_path)
-        today = date.today()
-        state = load_state(config.state_file, today)
-
         principal = caldav_sync.connect(
             config.icloud.apple_id, config.icloud.app_specific_password
         )
@@ -65,13 +61,68 @@ def run_sync(config_path: str) -> RunResult:
             else:
                 caldav_sync.delete_event_if_exists(calendar, name, today)
     except PrayerSyncError as e:
+        return RunResult(ok=False, message=f"iCloud sync failed: {e}")
+    except Exception as e:
+        return RunResult(ok=False, message=f"iCloud sync failed with an unexpected error: {e}")
+
+    return RunResult(
+        ok=True, message=f"synced iCloud calendar {config.icloud.calendar_name!r} for {today}"
+    )
+
+
+def _sync_google(config: Config, today: date, state: State) -> RunResult:
+    try:
+        service = google_calendar_sync.build_service(
+            config.google.client_id, config.google.client_secret, config.google.refresh_token
+        )
+        calendar_id = google_calendar_sync.get_or_create_calendar(
+            service, config.google.calendar_name
+        )
+
+        for name in CANONICAL_PRAYERS:
+            prayer_cfg = config.prayers[name]
+            if prayer_cfg.enabled:
+                pt = state.prayers[name]
+                google_calendar_sync.upsert_event(
+                    service, calendar_id, name, today, pt.iqama, prayer_cfg.minutes_before
+                )
+            else:
+                google_calendar_sync.delete_event_if_exists(service, calendar_id, name, today)
+    except PrayerSyncError as e:
+        return RunResult(ok=False, message=f"Google sync failed: {e}")
+    except Exception as e:
+        return RunResult(ok=False, message=f"Google sync failed with an unexpected error: {e}")
+
+    return RunResult(
+        ok=True, message=f"synced Google calendar {config.google.calendar_name!r} for {today}"
+    )
+
+
+def run_sync(config_path: str) -> RunResult:
+    try:
+        config = load_config(config_path)
+        today = date.today()
+        state = load_state(config.state_file, today)
+    except PrayerSyncError as e:
         return RunResult(ok=False, message=f"sync failed: {e}")
     except Exception as e:
         return RunResult(ok=False, message=f"sync failed with an unexpected error: {e}")
 
+    results: list[RunResult] = []
+    if config.icloud:
+        results.append(_sync_icloud(config, today, state))
+    if config.google and config.google.refresh_token:
+        results.append(_sync_google(config, today, state))
+
+    if not results:
+        return RunResult(
+            ok=False,
+            message="sync failed, no calendar connected (connect iCloud or Google Calendar in Settings)",
+        )
+
     return RunResult(
-        ok=True,
-        message=f"synced calendar {config.icloud.calendar_name!r} for {today}",
+        ok=all(r.ok for r in results),
+        message="; ".join(r.message for r in results),
     )
 
 

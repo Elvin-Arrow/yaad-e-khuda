@@ -1,17 +1,19 @@
 from __future__ import annotations
 
+import secrets
 from datetime import date
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, RootModel
 
-from . import caldav_sync, service
+from . import caldav_sync, google_calendar_sync, service
 from .config import (
     CANONICAL_PRAYERS,
     DEFAULT_CALENDAR_NAME,
+    DEFAULT_GOOGLE_CALENDAR_NAME,
     DEFAULT_SCHEDULE_TIME,
     DEFAULT_STATE_FILE,
     default_prayers_section,
@@ -19,9 +21,16 @@ from .config import (
     load_config,
     merge_raw,
     onboarding_status,
+    read_raw,
 )
 from .errors import PrayerSyncError
 from .mawaqit import extract_conf_data, fetch_html, today_prayer_times
+
+# Pending OAuth "state" tokens, keyed to themselves -- this is a single-user,
+# single-process app (same assumption the rest of the API makes), so an
+# in-memory set is enough to defend the callback against CSRF without a
+# session store.
+_pending_oauth_states: set[str] = set()
 
 
 class ICloudSetupRequest(BaseModel):
@@ -55,6 +64,12 @@ class PrayersUpdateRequest(RootModel[dict[str, PrayerUpdate]]):
 
 class ScheduleUpdateRequest(BaseModel):
     time: str
+
+
+class GoogleUpdateRequest(BaseModel):
+    client_id: str | None = None
+    client_secret: str | None = None
+    calendar_name: str | None = None
 
 
 def _prayer_times_response(prayer_times: dict) -> dict:
@@ -119,10 +134,20 @@ def create_app(config_path: str = "config.yaml") -> FastAPI:
                 "slug": config.mosque.slug,
                 "timezone_override": config.mosque.timezone_override,
             },
-            "icloud": {
-                "apple_id": config.icloud.apple_id,
-                "calendar_name": config.icloud.calendar_name,
-                "has_password": True,
+            "icloud": (
+                {
+                    "apple_id": config.icloud.apple_id,
+                    "calendar_name": config.icloud.calendar_name,
+                    "has_password": True,
+                }
+                if config.icloud
+                else None
+            ),
+            "google": {
+                "configured": bool(config.google and config.google.client_id and config.google.client_secret),
+                "connected": bool(config.google and config.google.refresh_token),
+                "calendar_name": config.google.calendar_name if config.google else DEFAULT_GOOGLE_CALENDAR_NAME,
+                "client_id": config.google.client_id if config.google else None,
             },
             "prayers": {
                 name: {"enabled": p.enabled, "minutes_before": p.minutes_before}
@@ -134,9 +159,15 @@ def create_app(config_path: str = "config.yaml") -> FastAPI:
     @app.put("/api/config/icloud")
     def update_icloud(body: ICloudUpdateRequest):
         config = load_config(config_path)
-        apple_id = body.apple_id or config.icloud.apple_id
-        calendar_name = body.calendar_name or config.icloud.calendar_name
-        password = body.app_specific_password or config.icloud.app_specific_password
+        apple_id = body.apple_id or (config.icloud.apple_id if config.icloud else None)
+        calendar_name = body.calendar_name or (
+            config.icloud.calendar_name if config.icloud else DEFAULT_CALENDAR_NAME
+        )
+        password = body.app_specific_password or (
+            config.icloud.app_specific_password if config.icloud else None
+        )
+        if not apple_id or not password:
+            raise HTTPException(400, "apple_id and app_specific_password are required")
 
         caldav_sync.connect(apple_id, password)
         merge_raw(
@@ -149,6 +180,84 @@ def create_app(config_path: str = "config.yaml") -> FastAPI:
                 }
             },
         )
+        return {"ok": True}
+
+    @app.put("/api/config/google")
+    def update_google(body: GoogleUpdateRequest):
+        raw = read_raw(config_path)
+        existing = raw.get("google") or {}
+        client_id = body.client_id or existing.get("client_id")
+        client_secret = body.client_secret or existing.get("client_secret")
+        calendar_name = body.calendar_name or existing.get("calendar_name") or DEFAULT_GOOGLE_CALENDAR_NAME
+
+        merge_raw(
+            config_path,
+            {
+                "google": {
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "calendar_name": calendar_name,
+                }
+            },
+        )
+        return {"ok": True}
+
+    @app.get("/api/google/oauth/start")
+    def google_oauth_start(request: Request):
+        raw = read_raw(config_path)
+        google_raw = raw.get("google") or {}
+        client_id = google_raw.get("client_id")
+        client_secret = google_raw.get("client_secret")
+        if not client_id or not client_secret:
+            raise HTTPException(
+                400, "save a Google Client ID and Client Secret before connecting"
+            )
+
+        redirect_uri = str(request.base_url) + "api/google/oauth/callback"
+        state = secrets.token_urlsafe(24)
+        _pending_oauth_states.add(state)
+
+        auth_url = google_calendar_sync.build_auth_url(client_id, redirect_uri, state)
+        return RedirectResponse(auth_url)
+
+    @app.get("/api/google/oauth/callback")
+    def google_oauth_callback(request: Request, code: str | None = None, state: str | None = None, error: str | None = None):
+        if error:
+            raise HTTPException(400, f"Google declined the connection: {error}")
+        if not state or state not in _pending_oauth_states:
+            raise HTTPException(400, "invalid or expired OAuth state")
+        _pending_oauth_states.discard(state)
+        if not code:
+            raise HTTPException(400, "Google did not return an authorization code")
+
+        raw = read_raw(config_path)
+        google_raw = raw.get("google") or {}
+        client_id = google_raw.get("client_id")
+        client_secret = google_raw.get("client_secret")
+        if not client_id or not client_secret:
+            raise HTTPException(400, "Google Client ID/Secret are no longer configured")
+
+        redirect_uri = str(request.base_url) + "api/google/oauth/callback"
+        tokens = google_calendar_sync.exchange_code(client_id, client_secret, code, redirect_uri)
+        refresh_token = tokens.get("refresh_token")
+        if not refresh_token:
+            raise HTTPException(
+                400,
+                "Google did not return a refresh token -- disconnect this app's access at "
+                "myaccount.google.com/permissions and try connecting again",
+            )
+
+        merge_raw(config_path, {"google": {"refresh_token": refresh_token, "enabled": True}})
+        return RedirectResponse("/?google=connected")
+
+    @app.post("/api/config/google/disconnect")
+    def disconnect_google():
+        raw = read_raw(config_path)
+        google_raw = raw.get("google") or {}
+        refresh_token = google_raw.get("refresh_token")
+        if refresh_token:
+            google_calendar_sync.revoke(refresh_token)
+        merge_raw(config_path, {"google": {"refresh_token": None, "enabled": False}})
         return {"ok": True}
 
     @app.put("/api/config/mosque")
