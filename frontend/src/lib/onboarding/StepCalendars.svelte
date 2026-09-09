@@ -67,15 +67,31 @@
 </script>
 
 <div class="steps">
+  <div class="intro">
+    <h2>Connect a calendar first</h2>
+    <p>
+      Yaad creates prayer reminders as events in a calendar you own, so your phone can deliver
+      its normal Calendar alarms. Connect iCloud, Google Calendar, or both to continue.
+    </p>
+    <p class="choice">Choose a calendar below, then enter its connection details.</p>
+  </div>
+
   <Card>
     <div class="card-header">
-      <h2>Connect iCloud</h2>
+      <h3>iCloud Calendar</h3>
       {#if hasIcloud}<span class="status saved">Connected</span>{/if}
     </div>
     {#if !hasIcloud}
       <p class="hint">
         Use an app-specific password — never your real Apple ID password. Generate one at
         appleid.apple.com, under Security → App-Specific Passwords.
+        <a
+          href="https://github.com/Elvin-Arrow/yaad-e-khuda/blob/main/docs/calendar-connections.md#connect-icloud-calendar"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Read the step-by-step iCloud guide.
+        </a>
       </p>
       <TextField label="Apple ID" type="email" bind:value={appleId} placeholder="you@icloud.com" />
       <TextField
@@ -99,7 +115,7 @@
 
   <Card>
     <div class="card-header">
-      <h2>Connect Google Calendar</h2>
+      <h3>Google Calendar</h3>
       {#if hasGoogle}<span class="status saved">Connected</span>{/if}
     </div>
     {#if justConnectedGoogle && hasGoogle}<Toast kind="success">Connected</Toast>{/if}
@@ -108,6 +124,13 @@
         Create an OAuth client (type "Web application") in the Google Cloud Console, enable the
         Calendar API, and register this app's own address plus
         <code>/api/google/oauth/callback</code> as an authorized redirect URI.
+        <a
+          href="https://github.com/Elvin-Arrow/yaad-e-khuda/blob/main/docs/calendar-connections.md#connect-google-calendar"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Read the step-by-step Google guide.
+        </a>
       </p>
       <TextField label="Client ID" bind:value={googleClientId} />
       <TextField label="Client Secret" type="password" bind:value={googleClientSecret} />
@@ -135,6 +158,35 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-5);
+  }
+
+  .intro {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: 0 var(--space-2);
+  }
+
+  .intro h2 {
+    font-size: 22px;
+    font-weight: 750;
+    letter-spacing: -0.35px;
+  }
+
+  .intro p {
+    color: var(--label-secondary);
+    font-size: 15px;
+    line-height: 1.45;
+  }
+
+  .intro .choice {
+    color: var(--label-primary);
+    font-weight: 600;
+  }
+
+  a {
+    color: var(--accent);
+    font-weight: 600;
   }
 
   code {
