@@ -98,6 +98,105 @@ def test_run_sync_upserts_all_enabled_prayers(config_path, fixture_html, monkeyp
     assert len([c for c in calls if c[0] == "delete"]) == 0
 
 
+def test_run_sync_syncs_google_when_connected(config_path, fixture_html, monkeypatch) -> None:
+    monkeypatch.setattr(service, "date", _FixedDate)
+    monkeypatch.setattr(service, "fetch_html", lambda slug: fixture_html)
+    assert service.run_fetch(config_path).ok
+
+    merge_raw(
+        config_path,
+        {
+            "google": {
+                "client_id": "id",
+                "client_secret": "secret",
+                "refresh_token": "rt",
+                "calendar_name": "Google Prayers",
+            }
+        },
+    )
+
+    calls: list[tuple[str, tuple]] = []
+    monkeypatch.setattr(service.caldav_sync, "connect", lambda apple_id, pw: "PRINCIPAL")
+    monkeypatch.setattr(
+        service.caldav_sync, "get_or_create_calendar", lambda principal, name: "CALENDAR"
+    )
+    monkeypatch.setattr(
+        service.caldav_sync, "upsert_event", lambda *a, **k: calls.append(("icloud_upsert", a))
+    )
+    monkeypatch.setattr(
+        service.caldav_sync, "delete_event_if_exists", lambda *a, **k: None
+    )
+    monkeypatch.setattr(
+        service.google_calendar_sync, "build_service", lambda *a, **k: "GOOGLE_SERVICE"
+    )
+    monkeypatch.setattr(
+        service.google_calendar_sync, "get_or_create_calendar", lambda service, name: "GCAL"
+    )
+    monkeypatch.setattr(
+        service.google_calendar_sync,
+        "upsert_event",
+        lambda *a, **k: calls.append(("google_upsert", a)),
+    )
+    monkeypatch.setattr(
+        service.google_calendar_sync, "delete_event_if_exists", lambda *a, **k: None
+    )
+
+    result = service.run_sync(config_path)
+
+    assert result.ok
+    assert len([c for c in calls if c[0] == "icloud_upsert"]) == 5
+    assert len([c for c in calls if c[0] == "google_upsert"]) == 5
+
+
+def test_run_sync_google_failure_does_not_block_icloud(config_path, fixture_html, monkeypatch) -> None:
+    monkeypatch.setattr(service, "date", _FixedDate)
+    monkeypatch.setattr(service, "fetch_html", lambda slug: fixture_html)
+    assert service.run_fetch(config_path).ok
+
+    merge_raw(
+        config_path,
+        {"google": {"client_id": "id", "client_secret": "secret", "refresh_token": "rt"}},
+    )
+
+    calls: list[str] = []
+    monkeypatch.setattr(service.caldav_sync, "connect", lambda apple_id, pw: "PRINCIPAL")
+    monkeypatch.setattr(
+        service.caldav_sync, "get_or_create_calendar", lambda principal, name: "CALENDAR"
+    )
+    monkeypatch.setattr(
+        service.caldav_sync, "upsert_event", lambda *a, **k: calls.append("icloud_upsert")
+    )
+    monkeypatch.setattr(service.caldav_sync, "delete_event_if_exists", lambda *a, **k: None)
+
+    def broken_build_service(*a, **k):
+        raise Exception("google is down")
+
+    monkeypatch.setattr(service.google_calendar_sync, "build_service", broken_build_service)
+
+    result = service.run_sync(config_path)
+
+    assert not result.ok
+    assert len([c for c in calls if c == "icloud_upsert"]) == 5
+    assert "Google sync failed" in result.message
+
+
+def test_run_sync_fails_when_no_calendar_connected(config_path, fixture_html, monkeypatch) -> None:
+    monkeypatch.setattr(service, "date", _FixedDate)
+    monkeypatch.setattr(service, "fetch_html", lambda slug: fixture_html)
+    assert service.run_fetch(config_path).ok
+
+    raw = merge_raw(config_path, {})
+    raw.pop("icloud", None)
+    from prayer_sync.config import write_raw
+
+    write_raw(config_path, raw)
+
+    result = service.run_sync(config_path)
+
+    assert not result.ok
+    assert "no calendar connected" in result.message
+
+
 def test_run_daily_skips_sync_when_fetch_fails(config_path, monkeypatch) -> None:
     monkeypatch.setattr(service, "date", _FixedDate)
     monkeypatch.setattr(
