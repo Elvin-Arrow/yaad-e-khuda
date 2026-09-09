@@ -134,6 +134,42 @@ anymore. `fastapi`/`uvicorn`/`apscheduler` are imported lazily inside
 `cmd_serve`, so the plain `fetch`/`sync` CLI path doesn't need them
 installed.
 
+### `_find_next_prayer`'s "before the first enabled prayer of the day" branch
+
+Originally returned `"resting": True, "progress": None` whenever nothing
+enabled had happened yet today (e.g. Fajr disabled, current time before
+Dhuhr) — there's no previous Iqama to measure a progress window from.
+That matched the frontend's convention of forcing the ring's progress to
+0 whenever `resting` is true.
+
+The bug: `NextPrayerRing.svelte`'s countdown *number* never checked
+`resting` — it always computed a live countdown straight from
+`nextPrayer.iqama`, which is populated in this branch. So the UI showed
+a real, ticking "1h 54m" above a ring that never fills, which reads as
+broken (reported against the live app, not just from reading the code).
+
+First fix attempt: make the frontend also blank the countdown number
+whenever `resting` is true, so the number and the empty ring agree. That
+technically matched the original design intent and the pre-existing test
+(`resting is True` for this branch), but made the screen *less* useful —
+a real, correct countdown got replaced with a bare "—" for no reason a
+user would find acceptable. Reverted.
+
+Actual fix: give this branch a real progress value instead of `None`,
+using midnight-to-Iqama as the window (`elapsed = now - midnight`,
+`span = next_pt.iqama - midnight`) since there's no previous enabled
+prayer's Iqama to use. `resting` is now `False` here — the countdown is
+real, so the ring fills to match it. `resting: True` is now reserved for
+the one case where there's genuinely nothing to show: after the day's
+last enabled prayer, with no upcoming Iqama at all
+(`tests/test_service.py::test_today_preview_reports_resting_after_last_prayer`).
+
+Verified against the real `config.yaml` in this repo (Fajr disabled,
+Dhuhr/Asr/Maghrib/Isha enabled) by running `yaad serve` +
+`npm run dev` and loading the app in a browser before Dhuhr — the ring
+now fills proportionally instead of sitting empty under a live
+countdown.
+
 ## Frontend
 
 ### Svelte 5 + `structuredClone` — a real bug, not a style choice
