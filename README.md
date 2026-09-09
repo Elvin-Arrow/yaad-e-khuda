@@ -109,10 +109,10 @@ Google's Calendar API needs an OAuth2 client, there's no app-specific-password s
 
 1. Create a project at console.cloud.google.com (or reuse one), then enable the **Google Calendar API** under APIs & Services.
 2. Under APIs & Services -> Credentials, create an **OAuth client ID** of type **Web application**.
-3. Add an **Authorized redirect URI** matching however you're running the app, plus `/api/google/oauth/callback`. For example `http://localhost:8000/api/google/oauth/callback` (bare `yaad serve`), `http://localhost:8180/api/google/oauth/callback` (Docker Compose), or your real HTTPS domain if you're behind a reverse proxy. You can register more than one URI on the same client if you use this in more than one way.
+3. Add an **Authorized redirect URI** matching however you're running the app, plus `/api/google/oauth/callback`. For example `http://localhost:8000/api/google/oauth/callback` (bare `yaad serve`), `http://localhost:8180/api/google/oauth/callback` (Docker Compose), or your real HTTPS domain if you're behind a reverse proxy. You can register more than one URI on the same client if you use this in more than one way. When TLS ends at a reverse proxy, set `YAAD_PUBLIC_BASE_URL` on the backend to that public HTTPS origin (for example, `https://yaad.example.com`) so Yaad sends Google the correct callback URL.
 4. Copy the **Client ID** and **Client Secret** into the app, either the Google card during onboarding or Settings later, then click **Connect Google Calendar**. You'll land on Google's consent screen, approve it, and you're redirected straight back into the app, connected.
 
-The app derives its own redirect URI from whatever address you're visiting it at, so it works whether you're on localhost, Docker Compose, or a domain, as long as that exact URI is registered on the OAuth client in step 3.
+The app derives its redirect URI from the address you're visiting, unless `YAAD_PUBLIC_BASE_URL` is set for a TLS-terminating reverse proxy. In either case, the exact resulting URI must be registered on the OAuth client in step 3.
 
 4. As long as `yaad serve` keeps running, it fetches and syncs itself once a day, at whatever time you set on the Settings page's Schedule card (03:00 by default, editable without restarting). Keep the server running for this to happen without you. See "Running it persistently" below.
 
