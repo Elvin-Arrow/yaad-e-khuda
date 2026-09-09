@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import secrets
 from datetime import date
 from pathlib import Path
@@ -77,6 +78,12 @@ def _prayer_times_response(prayer_times: dict) -> dict:
         name: {"adhan": pt.adhan.isoformat(), "iqama": pt.iqama.isoformat()}
         for name, pt in prayer_times.items()
     }
+
+
+def _google_redirect_uri(request: Request) -> str:
+    public_base_url = os.environ.get("YAAD_PUBLIC_BASE_URL")
+    base_url = public_base_url.rstrip("/") if public_base_url else str(request.base_url).rstrip("/")
+    return f"{base_url}/api/google/oauth/callback"
 
 
 def create_app(config_path: str = "config.yaml") -> FastAPI:
@@ -213,7 +220,7 @@ def create_app(config_path: str = "config.yaml") -> FastAPI:
                 400, "save a Google Client ID and Client Secret before connecting"
             )
 
-        redirect_uri = str(request.base_url) + "api/google/oauth/callback"
+        redirect_uri = _google_redirect_uri(request)
         state = secrets.token_urlsafe(24)
         _pending_oauth_states.add(state)
 
@@ -237,7 +244,7 @@ def create_app(config_path: str = "config.yaml") -> FastAPI:
         if not client_id or not client_secret:
             raise HTTPException(400, "Google Client ID/Secret are no longer configured")
 
-        redirect_uri = str(request.base_url) + "api/google/oauth/callback"
+        redirect_uri = _google_redirect_uri(request)
         tokens = google_calendar_sync.exchange_code(client_id, client_secret, code, redirect_uri)
         refresh_token = tokens.get("refresh_token")
         if not refresh_token:
