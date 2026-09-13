@@ -39,3 +39,17 @@ def test_reschedule_calls_scheduler_reschedule_job(monkeypatch) -> None:
 def test_reschedule_is_noop_when_scheduler_not_started(monkeypatch) -> None:
     monkeypatch.setattr(scheduler, "_scheduler", None)
     scheduler.reschedule("05:00")
+
+
+def test_scheduled_run_is_attributed_to_scheduler(monkeypatch) -> None:
+    calls = []
+    monkeypatch.setattr(scheduler, "_config_path", "config.yaml")
+    monkeypatch.setattr(
+        scheduler.service,
+        "run_daily",
+        lambda config_path, *, trigger: calls.append((config_path, trigger)),
+    )
+
+    scheduler._run_job()
+
+    assert calls == [("config.yaml", "scheduler")]

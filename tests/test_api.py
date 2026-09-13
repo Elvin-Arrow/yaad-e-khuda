@@ -492,10 +492,31 @@ def test_sync_run_invokes_service(client, fixture_html, monkeypatch) -> None:
     monkeypatch.setattr(
         api_module.service,
         "run_daily",
-        lambda config_path: {"ok": True, "fetch": None, "sync": None, "ran_at": "now"},
+        lambda config_path, *, trigger: {
+            "ok": True,
+            "fetch": None,
+            "sync": None,
+            "ran_at": "now",
+            "last_success_at": "now",
+            "trigger": trigger,
+        },
     )
 
     resp = client.post("/api/sync/run")
 
     assert resp.status_code == 200
     assert resp.json()["ok"] is True
+    assert resp.json()["trigger"] == "api"
+
+
+def test_metrics_exposes_prometheus_output_and_request_id(client) -> None:
+    response = client.get("/api/setup/status", headers={"X-Request-ID": "request-123"})
+
+    assert response.headers["x-request-id"] == "request-123"
+
+    metrics = client.get("/metrics")
+
+    assert metrics.status_code == 200
+    assert "text/plain" in metrics.headers["content-type"]
+    assert 'yaad_http_requests_total{method="GET",route="/api/setup/status",status="200"}' in metrics.text
+    assert "yaad_last_successful_sync_timestamp_seconds" in metrics.text

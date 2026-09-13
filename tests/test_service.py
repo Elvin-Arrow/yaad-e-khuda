@@ -267,6 +267,25 @@ def test_run_daily_skips_sync_when_fetch_fails(config_path, monkeypatch, use_pro
 
     recorded = service.last_run_status()
     assert recorded["ok"] is False
+    assert recorded["last_success_at"] is None
+
+
+def test_run_daily_preserves_last_success_timestamp_after_failure(
+    config_path, fixture_html, monkeypatch, use_provider
+) -> None:
+    monkeypatch.setattr(service, "date", _FixedDate)
+    use_provider(lambda _identifier, day, override: _daily_times(fixture_html, day, override))
+    monkeypatch.setattr(service.caldav_sync, "connect", lambda *_: "PRINCIPAL")
+    monkeypatch.setattr(service.caldav_sync, "get_or_create_calendar", lambda *_: "CALENDAR")
+    monkeypatch.setattr(service.caldav_sync, "upsert_event", lambda *_: None)
+
+    successful = service.run_daily(config_path, trigger="scheduler")
+
+    use_provider(lambda _identifier, _day, _override: Exception("network down"))
+    failed = service.run_daily(config_path, trigger="scheduler")
+
+    assert successful["last_success_at"] == successful["ran_at"]
+    assert failed["last_success_at"] == successful["ran_at"]
 
 
 def test_last_run_status_placeholder_when_never_run(config_path) -> None:
