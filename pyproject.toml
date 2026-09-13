@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "yaad-e-khuda"
 version = "0.1.0"
-description = "Sync Mawaqit iqama times into iCloud Calendar as native alarms."
+description = "Sync mosque iqama times into calendars as native alarms."
 requires-python = ">=3.11"
 dependencies = [
     "requests>=2.31",
