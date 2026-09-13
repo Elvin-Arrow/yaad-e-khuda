@@ -1,6 +1,6 @@
 # Yaad e Khuda
 
-A small tool that keeps your prayer times where you'll actually see them. It reads today's Iqama times off your mosque's Mawaqit page and writes them into a dedicated calendar on your iCloud account, your Google account, or both, as real events with real alarms. No extra app to check, no notification you have to remember exists. The reminder just shows up in the Calendar app you already look at.
+Yaad e Khuda pulls timings from supported platforms and puts them into a calendar you already use as real events with native alarms. MAWAQIT is the first supported platform, providing a mosque's daily Adhan and Iqama times; iCloud, Google Calendar, or both can receive the events. No extra app to check, no notification you have to remember exists. The reminder just shows up in the Calendar app you already look at.
 
 The name means "remembrance of God." That's the whole point of the project, so it felt right.
 
@@ -19,7 +19,7 @@ The Home dashboard, once you're set up, today's times, a countdown ring, and a t
 
 ## What it actually does
 
-Every day, it fetches your mosque's page, pulls out today's Adhan and Iqama times, and syncs them into a calendar you own, iCloud, Google, or both at once, as events with native alarms/reminders attached. Because these are real events in a calendar you own (not a subscribed feed), the alarms actually fire. Both Apple and Google strip alarms from subscribed/shared calendars, so that approach was a dead end from the start.
+Every day, it fetches timings from your configured platform and syncs them into a calendar you own, iCloud, Google, or both at once, as events with native alarms/reminders attached. MAWAQIT is currently the first and only supported platform, so those events are a mosque's daily Adhan and Iqama times. Because these are real events in a calendar you own (not a subscribed feed), the alarms actually fire. Both Apple and Google strip alarms from subscribed/shared calendars, so that approach was a dead end from the start.
 
 The CLI is called `yaad`, installed as a console script. You can run it three ways depending on how much infrastructure you want around it.
 
@@ -121,11 +121,11 @@ The app derives its redirect URI from the address you're visiting, unless `YAAD_
 Once you're set up, opening the app takes you to Home.
 
 - The ring at the top counts down to the next enabled prayer's Iqama, with "Next: {Prayer} at {time}" underneath. Before the day's first enabled prayer, or after the last one, it shows a resting state rather than a countdown. It doesn't peek ahead to tomorrow.
-- The Prayers card lists each prayer's actual Adhan and Iqama time for today (read only, computed live from Mawaqit), a stepper for how many minutes before Iqama the alarm should fire (type into it directly or use the plus/minus buttons), and a toggle to turn that prayer on or off entirely. Both autosave a moment after you change them; watch for the small "Saving…" or "Saved" label. Turning a prayer off doesn't just stop future syncing: the next sync actively removes its event from the calendar if one was already sitting there.
+- The Prayers card lists each prayer's actual Adhan and Iqama time for today (read only, computed live from the configured provider), a stepper for how many minutes before Iqama the alarm should fire (type into it directly or use the plus/minus buttons), and a toggle to turn that prayer on or off entirely. Both autosave a moment after you change them; watch for the small "Saving…" or "Saved" label. Turning a prayer off doesn't just stop future syncing: the next sync actively removes its event from the calendar if one was already sitting there.
 - The Sync card shows when the daily job last ran, and whether it worked (with the error message if it didn't). Sync Now triggers a fetch and sync right away, outside the daily schedule.
 - The gear icon in the top right opens Settings.
   - Appearance has a light mode toggle. It follows your system preference the first time, then remembers whatever you pick, stored in your browser rather than in `config.yaml` since it's a display preference, not a server one.
-  - The Mosque, iCloud, and Schedule cards each need an explicit Save (unlike the Prayers card), because saving re-checks against Mawaqit or iCloud first. On the iCloud card, leave the password field blank to keep the one already saved, only fill it in when you're actually rotating it.
+  - The Mosque, iCloud, and Schedule cards each need an explicit Save (unlike the Prayers card), because saving re-checks the configured provider or iCloud first. On the iCloud card, leave the password field blank to keep the one already saved, only fill it in when you're actually rotating it.
   - The back arrow returns you to Home.
 
 The app is a PWA, so it's installable, "Add to Home Screen" on iOS/Android, the install icon in Chrome/Edge on desktop, and then launches standalone without browser chrome. That relies on a service worker, and browsers only register those over HTTPS (or `localhost`), so install won't be offered while you're serving this over plain `http://` on your LAN, which is what Caddy does out of the box in the Docker Compose setup. Put Caddy behind TLS (a reverse proxy with a real cert, or something like Tailscale/Cloudflare Tunnel) if you want the install prompt to show up there. Everything else about the app works identically either way, this only affects that one step.
@@ -168,7 +168,7 @@ yaad serve                    # backend on :8000, in another terminal
 Skip npm, `serve`, and Docker entirely and drive it by hand or via cron instead.
 
 1. Follow the venv step above (`pip install -e .`).
-2. Get your mosque slug and iCloud app-specific password as described above.
+2. Get your mosque timetable-provider identifier (a MAWAQIT slug today) and iCloud app-specific password as described above.
 3. Create your config.
 
    ```sh
@@ -176,7 +176,7 @@ Skip npm, `serve`, and Docker entirely and drive it by hand or via cron instead.
    chmod 600 config.yaml
    ```
 
-   Edit it directly: mosque slug, iCloud credentials and calendar name, and each prayer's `enabled` and `minutes_before`. The `schedule` section doesn't matter here; it's only read by `serve`. Google Calendar's `refresh_token` can only be filled in through the OAuth flow in the web UI, so if you want Google alongside (or instead of) iCloud on a cron-driven setup, run `yaad serve` once, connect Google Calendar from Settings, then go back to cron; `client_id`/`client_secret`/`refresh_token` all live in `config.yaml` either way.
+   Edit it directly: mosque provider and identifier, iCloud credentials and calendar name, and each prayer's `enabled` and `minutes_before`. The `schedule` section doesn't matter here; it's only read by `serve`. Google Calendar's `refresh_token` can only be filled in through the OAuth flow in the web UI, so if you want Google alongside (or instead of) iCloud on a cron-driven setup, run `yaad serve` once, connect Google Calendar from Settings, then go back to cron; `client_id`/`client_secret`/`refresh_token` all live in `config.yaml` either way.
 
 4. Run it once by hand to make sure it works end to end.
 
@@ -204,7 +204,7 @@ Skip npm, `serve`, and Docker entirely and drive it by hand or via cron instead.
 .venv/bin/python -m pytest
 ```
 
-The suite runs fully offline: mosque page parsing is tested against a fixture in `tests/fixtures/`, the CalDAV upsert and delete logic against an in-memory fake calendar, and the FastAPI routes through `TestClient` with the mawaqit and CalDAV calls monkeypatched. No live iCloud account or network needed. There's no automated frontend suite (a personal UI is usually fastest to check by just looking at it); the acceptance criteria in `docs/idea.md` §6 are meant to be walked through by hand, once, against your real account.
+The suite runs fully offline: provider parsing is tested against a fixture in `tests/fixtures/`, the CalDAV upsert and delete logic against an in-memory fake calendar, and the FastAPI routes through `TestClient` with provider and CalDAV calls monkeypatched. No live iCloud account or network needed. There's no automated frontend suite (a personal UI is usually fastest to check by just looking at it); the acceptance criteria in `docs/idea.md` §6 are meant to be walked through by hand, once, against your real account.
 
 ## Project layout
 
@@ -214,7 +214,7 @@ docker-compose.yml       # backend (port 8100) + frontend (port 8180) services
 
 src/prayer_sync/
 ├── config.py        # load_config() -- re-read fresh every run; onboarding's partial-write helpers
-├── mawaqit.py        # fetch mosque page, extract confData, compute today's adhan/iqama
+├── providers/        # provider interface, registry, and MAWAQIT implementation
 ├── state.py          # local JSON state: today's computed times (atomic write)
 ├── caldav_sync.py     # iCloud CalDAV: find/create calendar, upsert/delete events
 ├── google_calendar_sync.py  # Google Calendar API: OAuth, find/create calendar, upsert/delete events
@@ -234,3 +234,25 @@ frontend/
     ├── onboarding/                 # 2-step wizard: connect calendar(s) (iCloud and/or Google), then mosque
     └── settings/                  # Settings.svelte (shell) -> HomePage.svelte / SettingsPage.svelte
 ```
+
+## Timetable providers
+
+Mosque timetable retrieval is isolated behind a small provider interface. The
+current and only implemented provider is `mawaqit`:
+
+```yaml
+mosque:
+  provider: mawaqit
+  identifier: your-mosque-slug
+```
+
+`identifier` belongs to the selected provider; for MAWAQIT it is the final
+segment of `https://mawaqit.net/en/<slug>`. Existing configurations using
+`mosque.slug` continue to work and are treated as `provider: mawaqit` with
+that slug as the identifier. The web UI still asks for a MAWAQIT slug because
+MAWAQIT is currently the sole supported provider.
+
+To add a provider later: implement the normalized prayer-time provider
+interface, register it under a stable provider name, parse any provider-specific
+configuration at the boundary, and add fixture-based tests. Calendar syncing
+and the core prayer state should not need provider-specific changes.
