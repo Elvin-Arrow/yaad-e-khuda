@@ -56,6 +56,14 @@ Pick whichever fits. All three end up doing the same sync.
    docker compose logs -f frontend   # Caddy access log
    ```
 
+   Backend application logs are JSON lines, which makes them easy to search in
+   Docker or a log collector. Set `YAAD_LOG_LEVEL=DEBUG` on `yaad-backend` if
+   you need more detail. The backend also exposes Prometheus metrics at
+   `http://yaad-backend:8000/metrics` to containers on the Compose network
+   (or `http://localhost:8100/metrics` in the default Compose setup). This
+   endpoint is intentionally not proxied through the public frontend; put it
+   behind network controls or authentication if you choose to publish it.
+
 4. Ports `8100` and `8180` were just free on the machine this was built on. Change the host side of the `ports` mappings in `docker-compose.yml` if either one collides with something you already have running.
 
 Under the hood, the frontend container is Caddy serving the built Svelte files and reverse proxying `/api/*` to the backend by its Compose service name. That mirrors how the Vite dev server proxy works locally, so the browser only ever talks to one origin either way.
