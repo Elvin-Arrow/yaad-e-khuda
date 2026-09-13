@@ -56,7 +56,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="yaad", parents=[config_parent])
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser(
-        "fetch", parents=[config_parent], help="fetch today's prayer times from Mawaqit"
+        "fetch", parents=[config_parent], help="fetch today's prayer times from the configured provider"
     )
     subparsers.add_parser(
         "sync", parents=[config_parent], help="sync today's prayer times to iCloud"

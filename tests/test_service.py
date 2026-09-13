@@ -5,6 +5,8 @@ import pytest
 
 from prayer_sync import service
 from prayer_sync.config import default_prayers_section, load_config, merge_raw
+from prayer_sync.providers.base import DailyPrayerTimes
+from prayer_sync.providers.mawaqit import extract_conf_data, today_prayer_times
 
 FIXTURE_PATH = os.path.join(os.path.dirname(__file__), "fixtures", "mosque_sample.html")
 
@@ -19,6 +21,33 @@ class _FixedDate(date):
 def fixture_html() -> str:
     with open(FIXTURE_PATH, "r", encoding="utf-8") as f:
         return f.read()
+
+
+@pytest.fixture
+def use_provider(monkeypatch):
+    """Configure the service with an in-process provider test double."""
+
+    def configure(response):
+        class Provider:
+            def fetch_prayer_times(self, identifier, day, *, timezone_override=None):
+                result = response(identifier, day, timezone_override)
+                if isinstance(result, Exception):
+                    raise result
+                return result
+
+        monkeypatch.setattr(service, "get_provider", lambda _name: Provider())
+
+    return configure
+
+
+def _daily_times(html: str, day: date, timezone_override: str | None) -> DailyPrayerTimes:
+    conf = extract_conf_data(html)
+    return DailyPrayerTimes(
+        day=day,
+        timezone=timezone_override or conf["timezone"],
+        prayers=today_prayer_times(conf, day, tz_override=timezone_override),
+        mosque_name=conf.get("name"),
+    )
 
 
 @pytest.fixture
@@ -42,9 +71,9 @@ def config_path(tmp_path, monkeypatch) -> str:
     return path
 
 
-def test_run_fetch_success_writes_state(config_path, fixture_html, monkeypatch) -> None:
+def test_run_fetch_success_writes_state(config_path, fixture_html, monkeypatch, use_provider) -> None:
     monkeypatch.setattr(service, "date", _FixedDate)
-    monkeypatch.setattr(service, "fetch_html", lambda slug: fixture_html)
+    use_provider(lambda _identifier, day, override: _daily_times(fixture_html, day, override))
 
     result = service.run_fetch(config_path)
 
@@ -52,9 +81,31 @@ def test_run_fetch_success_writes_state(config_path, fixture_html, monkeypatch) 
     assert os.path.exists("state/today.json")
 
 
-def test_run_fetch_failure_does_not_crash(config_path, monkeypatch) -> None:
+def test_run_fetch_resolves_configured_provider(config_path, fixture_html, monkeypatch) -> None:
     monkeypatch.setattr(service, "date", _FixedDate)
-    monkeypatch.setattr(service, "fetch_html", lambda slug: "<html>no confData here</html>")
+    calls: list[tuple[str, str, date, str | None]] = []
+
+    class Provider:
+        def fetch_prayer_times(self, identifier, day, *, timezone_override=None):
+            calls.append(("fetch", identifier, day, timezone_override))
+            return _daily_times(fixture_html, day, timezone_override)
+
+    monkeypatch.setattr(
+        service,
+        "get_provider",
+        lambda provider_name: calls.append(("resolve", provider_name, None, None)) or Provider(),
+    )
+
+    assert service.run_fetch(config_path).ok
+    assert calls == [
+        ("resolve", "mawaqit", None, None),
+        ("fetch", "test-mosque", date(2026, 1, 1), None),
+    ]
+
+
+def test_run_fetch_failure_does_not_crash(config_path, monkeypatch, use_provider) -> None:
+    monkeypatch.setattr(service, "date", _FixedDate)
+    use_provider(lambda _identifier, _day, _override: Exception("network down"))
 
     result = service.run_fetch(config_path)
 
@@ -72,9 +123,9 @@ def test_run_sync_fails_without_state(config_path, monkeypatch) -> None:
     assert "sync failed" in result.message
 
 
-def test_run_sync_upserts_all_enabled_prayers(config_path, fixture_html, monkeypatch) -> None:
+def test_run_sync_upserts_all_enabled_prayers(config_path, fixture_html, monkeypatch, use_provider) -> None:
     monkeypatch.setattr(service, "date", _FixedDate)
-    monkeypatch.setattr(service, "fetch_html", lambda slug: fixture_html)
+    use_provider(lambda _identifier, day, override: _daily_times(fixture_html, day, override))
     assert service.run_fetch(config_path).ok
 
     calls: list[tuple[str, tuple]] = []
@@ -98,9 +149,9 @@ def test_run_sync_upserts_all_enabled_prayers(config_path, fixture_html, monkeyp
     assert len([c for c in calls if c[0] == "delete"]) == 0
 
 
-def test_run_sync_syncs_google_when_connected(config_path, fixture_html, monkeypatch) -> None:
+def test_run_sync_syncs_google_when_connected(config_path, fixture_html, monkeypatch, use_provider) -> None:
     monkeypatch.setattr(service, "date", _FixedDate)
-    monkeypatch.setattr(service, "fetch_html", lambda slug: fixture_html)
+    use_provider(lambda _identifier, day, override: _daily_times(fixture_html, day, override))
     assert service.run_fetch(config_path).ok
 
     merge_raw(
@@ -148,9 +199,9 @@ def test_run_sync_syncs_google_when_connected(config_path, fixture_html, monkeyp
     assert len([c for c in calls if c[0] == "google_upsert"]) == 5
 
 
-def test_run_sync_google_failure_does_not_block_icloud(config_path, fixture_html, monkeypatch) -> None:
+def test_run_sync_google_failure_does_not_block_icloud(config_path, fixture_html, monkeypatch, use_provider) -> None:
     monkeypatch.setattr(service, "date", _FixedDate)
-    monkeypatch.setattr(service, "fetch_html", lambda slug: fixture_html)
+    use_provider(lambda _identifier, day, override: _daily_times(fixture_html, day, override))
     assert service.run_fetch(config_path).ok
 
     merge_raw(
@@ -180,9 +231,9 @@ def test_run_sync_google_failure_does_not_block_icloud(config_path, fixture_html
     assert "Google sync failed" in result.message
 
 
-def test_run_sync_fails_when_no_calendar_connected(config_path, fixture_html, monkeypatch) -> None:
+def test_run_sync_fails_when_no_calendar_connected(config_path, fixture_html, monkeypatch, use_provider) -> None:
     monkeypatch.setattr(service, "date", _FixedDate)
-    monkeypatch.setattr(service, "fetch_html", lambda slug: fixture_html)
+    use_provider(lambda _identifier, day, override: _daily_times(fixture_html, day, override))
     assert service.run_fetch(config_path).ok
 
     raw = merge_raw(config_path, {})
@@ -197,13 +248,9 @@ def test_run_sync_fails_when_no_calendar_connected(config_path, fixture_html, mo
     assert "no calendar connected" in result.message
 
 
-def test_run_daily_skips_sync_when_fetch_fails(config_path, monkeypatch) -> None:
+def test_run_daily_skips_sync_when_fetch_fails(config_path, monkeypatch, use_provider) -> None:
     monkeypatch.setattr(service, "date", _FixedDate)
-    monkeypatch.setattr(
-        service,
-        "fetch_html",
-        lambda slug: (_ for _ in ()).throw(Exception("network down")),
-    )
+    use_provider(lambda _identifier, _day, _override: Exception("network down"))
     sync_calls = []
     monkeypatch.setattr(
         service,
@@ -228,9 +275,9 @@ def test_last_run_status_placeholder_when_never_run(config_path) -> None:
 
 
 def test_today_preview_reports_mosque_name(
-    config_path, fixture_html, monkeypatch
+    config_path, fixture_html, monkeypatch, use_provider
 ) -> None:
-    monkeypatch.setattr(service, "fetch_html", lambda slug: fixture_html)
+    use_provider(lambda _identifier, day, override: _daily_times(fixture_html, day, override))
 
     real_datetime = service.datetime
 
@@ -249,9 +296,9 @@ def test_today_preview_reports_mosque_name(
 
 
 def test_today_preview_reports_progress_before_first_prayer(
-    config_path, fixture_html, monkeypatch
+    config_path, fixture_html, monkeypatch, use_provider
 ) -> None:
-    monkeypatch.setattr(service, "fetch_html", lambda slug: fixture_html)
+    use_provider(lambda _identifier, day, override: _daily_times(fixture_html, day, override))
 
     real_datetime = service.datetime
 
@@ -273,9 +320,9 @@ def test_today_preview_reports_progress_before_first_prayer(
 
 
 def test_today_preview_reports_progress_between_prayers(
-    config_path, fixture_html, monkeypatch
+    config_path, fixture_html, monkeypatch, use_provider
 ) -> None:
-    monkeypatch.setattr(service, "fetch_html", lambda slug: fixture_html)
+    use_provider(lambda _identifier, day, override: _daily_times(fixture_html, day, override))
 
     real_datetime = service.datetime
 
@@ -298,9 +345,9 @@ def test_today_preview_reports_progress_between_prayers(
 
 
 def test_today_preview_reports_resting_after_last_prayer(
-    config_path, fixture_html, monkeypatch
+    config_path, fixture_html, monkeypatch, use_provider
 ) -> None:
-    monkeypatch.setattr(service, "fetch_html", lambda slug: fixture_html)
+    use_provider(lambda _identifier, day, override: _daily_times(fixture_html, day, override))
 
     real_datetime = service.datetime
 

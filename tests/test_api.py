@@ -1,5 +1,6 @@
 import os
-from datetime import date
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 
 import pytest
 from fastapi.testclient import TestClient
@@ -7,6 +8,8 @@ from fastapi.testclient import TestClient
 from prayer_sync import api as api_module
 from prayer_sync.config import onboarding_status
 from prayer_sync.errors import CalDavSyncError, MawaqitError
+from prayer_sync.providers import DailyPrayerTimes
+from prayer_sync.state import PrayerTime
 
 FIXTURE_PATH = os.path.join(os.path.dirname(__file__), "fixtures", "mosque_sample.html")
 
@@ -15,6 +18,34 @@ class _FixedDate(date):
     @classmethod
     def today(cls):
         return date(2026, 1, 1)
+
+
+class _FixtureProvider:
+    """A normalized provider double: API routes must not know MAWAQIT internals."""
+
+    def fetch_prayer_times(self, mosque_identifier, day, *, timezone_override=None):
+        tz_name = timezone_override or "Europe/Paris"
+        tz = ZoneInfo(tz_name)
+        prayers = {
+            name: PrayerTime(
+                adhan=datetime(day.year, day.month, day.day, hour, 0, tzinfo=tz),
+                iqama=datetime(day.year, day.month, day.day, hour, 15, tzinfo=tz),
+            )
+            for name, hour in {
+                "fajr": 5,
+                "dhuhr": 12,
+                "asr": 15,
+                "maghrib": 18,
+                "isha": 20,
+            }.items()
+        }
+        return DailyPrayerTimes(
+            day=day, timezone=tz_name, prayers=prayers, mosque_name="Test Mosque"
+        )
+
+
+def _use_fixture_provider(monkeypatch) -> None:
+    monkeypatch.setattr(api_module, "get_provider", lambda name: _FixtureProvider())
 
 
 @pytest.fixture
@@ -80,10 +111,11 @@ def test_setup_icloud_saves_on_success(client, config_path, monkeypatch) -> None
 
 
 def test_setup_mosque_rejects_bad_slug(client, config_path, monkeypatch) -> None:
-    def fake_fetch_html(slug):
-        raise MawaqitError("mosque not found")
+    class _FailingProvider:
+        def fetch_prayer_times(self, mosque_identifier, day, *, timezone_override=None):
+            raise MawaqitError("mosque not found")
 
-    monkeypatch.setattr(api_module, "fetch_html", fake_fetch_html)
+    monkeypatch.setattr(api_module, "get_provider", lambda name: _FailingProvider())
 
     resp = client.post("/api/setup/mosque", json={"slug": "does-not-exist"})
 
@@ -94,7 +126,7 @@ def test_setup_mosque_rejects_bad_slug(client, config_path, monkeypatch) -> None
 def test_setup_mosque_saves_and_returns_preview(
     client, config_path, fixture_html, monkeypatch
 ) -> None:
-    monkeypatch.setattr(api_module, "fetch_html", lambda slug: fixture_html)
+    _use_fixture_provider(monkeypatch)
     monkeypatch.setattr(api_module, "date", _FixedDate)
 
     resp = client.post("/api/setup/mosque", json={"slug": "test-mosque"})
@@ -105,6 +137,27 @@ def test_setup_mosque_saves_and_returns_preview(
     assert body["timezone"] == "Europe/Paris"
     assert set(body["preview"].keys()) == {"fajr", "dhuhr", "asr", "maghrib", "isha"}
     assert onboarding_status(config_path)["has_mosque"] is True
+    from prayer_sync.config import read_raw
+
+    assert read_raw(config_path)["mosque"] == {
+        "provider": "mawaqit",
+        "identifier": "test-mosque",
+        "timezone_override": None,
+    }
+
+
+def test_setup_mosque_migrates_legacy_slug(client, config_path, monkeypatch) -> None:
+    from prayer_sync.config import read_raw, write_raw
+
+    write_raw(config_path, {"mosque": {"slug": "old-mosque"}})
+    _use_fixture_provider(monkeypatch)
+
+    resp = client.post("/api/setup/mosque", json={"slug": "new-mosque"})
+
+    assert resp.status_code == 200
+    mosque = read_raw(config_path)["mosque"]
+    assert mosque["identifier"] == "new-mosque"
+    assert "slug" not in mosque
 
 
 def _complete_onboarding(client: TestClient, fixture_html: str, monkeypatch) -> None:
@@ -112,7 +165,7 @@ def _complete_onboarding(client: TestClient, fixture_html: str, monkeypatch) -> 
     client.post(
         "/api/setup/icloud", json={"apple_id": "a@b.com", "app_specific_password": "pw"}
     )
-    monkeypatch.setattr(api_module, "fetch_html", lambda slug: fixture_html)
+    _use_fixture_provider(monkeypatch)
     monkeypatch.setattr(api_module, "date", _FixedDate)
     monkeypatch.setattr(api_module.service, "date", _FixedDate)
     client.post("/api/setup/mosque", json={"slug": "test-mosque"})
@@ -130,7 +183,52 @@ def test_get_config_never_includes_the_password(
     body = resp.json()
     assert body["icloud"]["has_password"] is True
     assert body["mosque"]["slug"] == "test-mosque"
+    assert body["mosque"]["provider"] == "mawaqit"
     assert body["schedule"]["time"] == "03:00"
+
+
+def test_update_mosque_resolves_configured_provider_and_persists_identifier(
+    client, config_path, fixture_html, monkeypatch
+) -> None:
+    _complete_onboarding(client, fixture_html, monkeypatch)
+    calls = []
+
+    class _RecordingProvider(_FixtureProvider):
+        def fetch_prayer_times(self, mosque_identifier, day, *, timezone_override=None):
+            calls.append((mosque_identifier, timezone_override))
+            return super().fetch_prayer_times(
+                mosque_identifier, day, timezone_override=timezone_override
+            )
+
+    monkeypatch.setattr(api_module, "get_provider", lambda name: _RecordingProvider())
+
+    resp = client.put("/api/config/mosque", json={"slug": "new-mosque"})
+
+    assert resp.status_code == 200
+    assert calls == [("new-mosque", None)]
+    from prayer_sync.config import read_raw
+
+    assert read_raw(config_path)["mosque"]["identifier"] == "new-mosque"
+    assert read_raw(config_path)["mosque"]["provider"] == "mawaqit"
+
+
+def test_update_mosque_migrates_legacy_slug(
+    client, config_path, fixture_html, monkeypatch
+) -> None:
+    from prayer_sync.config import read_raw, write_raw
+
+    _complete_onboarding(client, fixture_html, monkeypatch)
+    raw = read_raw(config_path)
+    raw["mosque"] = {"slug": "old-mosque"}
+    write_raw(config_path, raw)
+    _use_fixture_provider(monkeypatch)
+
+    resp = client.put("/api/config/mosque", json={"slug": "new-mosque"})
+
+    assert resp.status_code == 200
+    mosque = read_raw(config_path)["mosque"]
+    assert mosque["identifier"] == "new-mosque"
+    assert "slug" not in mosque
 
 
 def test_update_prayers_persists_and_validates(client, fixture_html, monkeypatch) -> None:
@@ -192,7 +290,7 @@ def test_update_icloud_revalidates_and_keeps_password_if_omitted(
 
 def test_prayer_times_today(client, fixture_html, monkeypatch) -> None:
     _complete_onboarding(client, fixture_html, monkeypatch)
-    monkeypatch.setattr(api_module.service, "fetch_html", lambda slug: fixture_html)
+    monkeypatch.setattr(api_module.service, "get_provider", lambda name: _FixtureProvider())
 
     resp = client.get("/api/prayer-times/today")
 
@@ -357,7 +455,7 @@ def test_onboarding_completes_with_google_only(client, config_path, fixture_html
         config_path,
         {"google": {"client_id": "id", "client_secret": "secret", "refresh_token": "rt"}},
     )
-    monkeypatch.setattr(api_module, "fetch_html", lambda slug: fixture_html)
+    _use_fixture_provider(monkeypatch)
     monkeypatch.setattr(api_module, "date", _FixedDate)
 
     resp = client.post("/api/setup/mosque", json={"slug": "test-mosque"})
@@ -375,7 +473,7 @@ def test_get_config_reports_icloud_as_none_when_not_connected(
         config_path,
         {"google": {"client_id": "id", "client_secret": "secret", "refresh_token": "rt"}},
     )
-    monkeypatch.setattr(api_module, "fetch_html", lambda slug: fixture_html)
+    _use_fixture_provider(monkeypatch)
     monkeypatch.setattr(api_module, "date", _FixedDate)
     client.post("/api/setup/mosque", json={"slug": "test-mosque"})
 

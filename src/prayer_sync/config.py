@@ -21,8 +21,18 @@ _HHMM_RE = re.compile(r"^([01]\d|2[0-3]):([0-5]\d)$")
 
 @dataclass(frozen=True)
 class MosqueConfig:
-    slug: str
+    provider: str
+    identifier: str
     timezone_override: str | None = None
+
+    @property
+    def slug(self) -> str:
+        """Legacy name for the MAWAQIT mosque identifier.
+
+        This keeps integrations built against the pre-provider configuration
+        model working while new application code uses ``identifier``.
+        """
+        return self.identifier
 
 
 @dataclass(frozen=True)
@@ -104,8 +114,16 @@ def load_config(path: str) -> Config:
         raise ConfigError(f"config file is empty or not a mapping: {path}")
 
     mosque_raw = raw.get("mosque") or {}
+    if not isinstance(mosque_raw, dict):
+        raise ConfigError("config: mosque must be a mapping")
+    identifier = mosque_raw.get("identifier") or mosque_raw.get("slug")
+    if identifier in (None, ""):
+        raise ConfigError(
+            "config: missing required field 'identifier' (or legacy 'slug') in mosque"
+        )
     mosque = MosqueConfig(
-        slug=str(_require(mosque_raw, "slug", "mosque")),
+        provider=str(mosque_raw.get("provider") or "mawaqit"),
+        identifier=str(identifier),
         timezone_override=mosque_raw.get("timezone_override"),
     )
 
@@ -220,7 +238,7 @@ def onboarding_status(path: str) -> dict:
         icloud.get("app_specific_password")
     )
     has_google = bool(google.get("refresh_token"))
-    has_mosque = bool(mosque.get("slug"))
+    has_mosque = bool(mosque.get("identifier") or mosque.get("slug"))
     return {
         "has_icloud": has_icloud,
         "has_google": has_google,

@@ -21,7 +21,17 @@ questions get answered instead.
 - `ICloudConfig.__repr__` is overridden so the password never leaks into
   an accidental log/print of the config object.
 
-## `mawaqit.py`
+## Timetable providers and MAWAQIT
+
+- The provider interface returns Yaad e Khuda's normalized daily prayer data;
+  the service, state, and calendar integrations do not parse provider payloads
+  or import provider implementations. The registry is intentionally explicit
+  rather than a plugin or dynamic-loading system.
+- Provider discovery is separate from fetching. A future website/ICS discovery
+  feature can resolve a provider plus identifier without expanding the prayer
+  provider's fetching contract.
+- `mawaqit` is currently the sole registered provider. It owns MAWAQIT URLs,
+  `confData`, and all MAWAQIT-specific parsing details.
 
 - Deliberately does **not** depend on the `py-mawaqit`/`mawaqit` PyPI
   packages. One pulls in `requests_html` + `pyppeteer` (a headless
@@ -279,8 +289,12 @@ curling `/api/*` through the frontend, not by reading the Caddyfile.
 
 ## `config.example.yaml` field reference
 
-- `mosque.slug`: the last path segment of the mosque's Mawaqit page URL
-  (`https://mawaqit.net/en/<slug>`).
+- `mosque.provider`: the registered timetable provider name. `mawaqit` is the
+  only supported value today.
+- `mosque.identifier`: the identifier understood by the selected provider;
+  for MAWAQIT, the last path segment of its page URL
+  (`https://mawaqit.net/en/<slug>`). Legacy `mosque.slug` remains accepted as
+  an implicit MAWAQIT configuration for backwards compatibility.
 - `mosque.timezone_override`: normally left `null` — the mosque's IANA
   timezone is read straight out of its own `confData` (`"timezone"`
   field). Only set this to override what the mosque page reports.

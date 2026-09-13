@@ -66,9 +66,28 @@ def test_onboarding_status_after_both_steps(tmp_path) -> None:
         "complete": True,
     }
     config = load_config(path)
+    assert config.mosque.provider == "mawaqit"
+    assert config.mosque.identifier == "some-mosque"
     assert config.mosque.slug == "some-mosque"
     assert set(config.prayers.keys()) == set(CANONICAL_PRAYERS)
     assert config.schedule.time == "03:00"
+
+
+def test_load_config_accepts_explicit_provider_and_identifier(tmp_path) -> None:
+    path = str(tmp_path / "config.yaml")
+    merge_raw(
+        path,
+        {
+            "mosque": {"provider": "mawaqit", "identifier": "some-mosque"},
+            "prayers": default_prayers_section(),
+        },
+    )
+
+    config = load_config(path)
+
+    assert config.mosque.provider == "mawaqit"
+    assert config.mosque.identifier == "some-mosque"
+    assert config.mosque.slug == "some-mosque"
 
 
 def test_onboarding_status_complete_with_google_only(tmp_path) -> None:
