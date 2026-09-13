@@ -5,30 +5,26 @@ import logging
 import sys
 
 from . import service
+from .observability import configure_logging, log_event
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    stream=sys.stderr,
-)
 log = logging.getLogger("prayer_sync")
 
 
 def cmd_fetch(config_path: str) -> int:
     result = service.run_fetch(config_path)
     if result.ok:
-        log.info(result.message)
+        log_event(log, logging.INFO, "fetch.completed", outcome="success")
         return 0
-    log.error(result.message)
+    log_event(log, logging.ERROR, "fetch.completed", outcome="failure")
     return 1
 
 
 def cmd_sync(config_path: str) -> int:
     result = service.run_sync(config_path)
     if result.ok:
-        log.info(result.message)
+        log_event(log, logging.INFO, "sync.completed", outcome="success")
         return 0
-    log.error(result.message)
+    log_event(log, logging.ERROR, "sync.completed", outcome="failure")
     return 1
 
 
@@ -41,13 +37,14 @@ def cmd_serve(config_path: str, host: str, port: int) -> int:
     app = create_app(config_path)
     scheduler_module.start(config_path)
     try:
-        uvicorn.run(app, host=host, port=port)
+        uvicorn.run(app, host=host, port=port, log_config=None, access_log=False)
     finally:
         scheduler_module.shutdown()
     return 0
 
 
 def main(argv: list[str] | None = None) -> int:
+    configure_logging()
     config_parent = argparse.ArgumentParser(add_help=False)
     config_parent.add_argument(
         "-c", "--config", default="config.yaml", help="path to config.yaml"

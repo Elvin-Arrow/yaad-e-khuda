@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import os
 import secrets
+import logging
 from datetime import date
+from time import perf_counter
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, RootModel
 
@@ -26,7 +28,16 @@ from .config import (
     write_raw,
 )
 from .errors import PrayerSyncError
+from .observability import (
+    HTTP_DURATION,
+    HTTP_REQUESTS,
+    log_event,
+    update_sync_freshness,
+)
 from .providers import get_provider
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+
+log = logging.getLogger("prayer_sync.api")
 
 # Pending OAuth "state" tokens, keyed to themselves -- this is a single-user,
 # single-process app (same assumption the rest of the API makes), so an
@@ -99,10 +110,40 @@ def _write_mosque_config(config_path: str, updates: dict) -> None:
 
 def create_app(config_path: str = "config.yaml") -> FastAPI:
     app = FastAPI(title="Prayer Time Sync")
+    update_sync_freshness(service.last_run_status())
+
+    @app.middleware("http")
+    async def observe_request(request: Request, call_next):
+        request_id = request.headers.get("x-request-id") or secrets.token_urlsafe(12)
+        started = perf_counter()
+        try:
+            response = await call_next(request)
+        except Exception:
+            route = getattr(request.scope.get("route"), "path", "unmatched")
+            duration = perf_counter() - started
+            HTTP_REQUESTS.labels(request.method, route, "500").inc()
+            HTTP_DURATION.labels(request.method, route).observe(duration)
+            log_event(log, logging.ERROR, "http.request.completed", request_id=request_id,
+                      method=request.method, route=route, status=500,
+                      duration_seconds=round(duration, 6), outcome="failure")
+            raise
+        route = getattr(request.scope.get("route"), "path", "unmatched")
+        duration = perf_counter() - started
+        HTTP_REQUESTS.labels(request.method, route, str(response.status_code)).inc()
+        HTTP_DURATION.labels(request.method, route).observe(duration)
+        response.headers["X-Request-ID"] = request_id
+        log_event(log, logging.INFO, "http.request.completed", request_id=request_id,
+                  method=request.method, route=route, status=response.status_code,
+                  duration_seconds=round(duration, 6), outcome="success" if response.status_code < 500 else "failure")
+        return response
 
     @app.exception_handler(PrayerSyncError)
     async def _handle_prayer_sync_error(_request, exc: PrayerSyncError):
         return JSONResponse(status_code=400, content={"detail": str(exc)})
+
+    @app.get("/metrics", include_in_schema=False)
+    def metrics():
+        return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
     @app.get("/api/setup/status")
     def setup_status():
@@ -357,7 +398,7 @@ def create_app(config_path: str = "config.yaml") -> FastAPI:
 
     @app.post("/api/sync/run")
     def sync_run():
-        return service.run_daily(config_path)
+        return service.run_daily(config_path, trigger="api")
 
     frontend_dist = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
     if frontend_dist.is_dir():

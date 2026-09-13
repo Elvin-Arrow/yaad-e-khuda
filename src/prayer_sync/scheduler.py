@@ -21,7 +21,7 @@ def _trigger_for(hhmm: str) -> CronTrigger:
 
 
 def _run_job() -> None:
-    service.run_daily(_config_path)
+    service.run_daily(_config_path, trigger="scheduler")
 
 
 def start(config_path: str) -> BackgroundScheduler:
