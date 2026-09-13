@@ -23,6 +23,7 @@ from .config import (
     merge_raw,
     onboarding_status,
     read_raw,
+    write_raw,
 )
 from .errors import PrayerSyncError
 from .providers import get_provider
@@ -86,6 +87,16 @@ def _google_redirect_uri(request: Request) -> str:
     return f"{base_url}/api/google/oauth/callback"
 
 
+def _write_mosque_config(config_path: str, updates: dict) -> None:
+    """Persist canonical mosque fields, migrating away the legacy ``slug`` key."""
+    raw = read_raw(config_path)
+    mosque = raw.get("mosque")
+    existing = dict(mosque) if isinstance(mosque, dict) else {}
+    existing.pop("slug", None)
+    raw["mosque"] = {**existing, **updates}
+    write_raw(config_path, raw)
+
+
 def create_app(config_path: str = "config.yaml") -> FastAPI:
     app = FastAPI(title="Prayer Time Sync")
 
@@ -117,14 +128,17 @@ def create_app(config_path: str = "config.yaml") -> FastAPI:
         provider = get_provider("mawaqit")
         daily_times = provider.fetch_prayer_times(body.slug, date.today())
 
+        _write_mosque_config(
+            config_path,
+            {
+                "provider": "mawaqit",
+                "identifier": body.slug,
+                "timezone_override": None,
+            },
+        )
         merge_raw(
             config_path,
             {
-                "mosque": {
-                    "provider": "mawaqit",
-                    "identifier": body.slug,
-                    "timezone_override": None,
-                },
                 "prayers": default_prayers_section(),
                 "state_file": DEFAULT_STATE_FILE,
                 "schedule": {"time": DEFAULT_SCHEDULE_TIME},
@@ -289,14 +303,12 @@ def create_app(config_path: str = "config.yaml") -> FastAPI:
                 slug, date.today(), timezone_override=timezone_override
             )
 
-        merge_raw(
+        _write_mosque_config(
             config_path,
             {
-                "mosque": {
-                    "provider": config.mosque.provider,
-                    "identifier": slug,
-                    "timezone_override": timezone_override,
-                }
+                "provider": config.mosque.provider,
+                "identifier": slug,
+                "timezone_override": timezone_override,
             },
         )
         return {"ok": True}
