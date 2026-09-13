@@ -8,7 +8,7 @@ from datetime import date, datetime, timezone
 from . import caldav_sync, google_calendar_sync
 from .config import CANONICAL_PRAYERS, Config, load_config
 from .errors import PrayerSyncError
-from .mawaqit import extract_conf_data, fetch_html, today_prayer_times
+from .providers import get_provider
 from .state import PrayerTime, State, load_state, save_state
 
 LAST_RUN_FILE = "state/last_run.json"
@@ -24,13 +24,13 @@ def run_fetch(config_path: str) -> RunResult:
     try:
         config = load_config(config_path)
         today = date.today()
-        html = fetch_html(config.mosque.slug)
-        conf = extract_conf_data(html)
-        prayer_times = today_prayer_times(
-            conf, today, tz_override=config.mosque.timezone_override
+        provider = get_provider(config.mosque.provider)
+        daily_times = provider.fetch_prayer_times(
+            config.mosque.identifier,
+            today,
+            timezone_override=config.mosque.timezone_override,
         )
-        tz_name = config.mosque.timezone_override or conf.get("timezone")
-        save_state(config.state_file, today, tz_name, prayer_times)
+        save_state(config.state_file, today, daily_times.timezone, daily_times.prayers)
     except PrayerSyncError as e:
         return RunResult(ok=False, message=f"fetch failed: {e}")
     except Exception as e:
@@ -38,7 +38,7 @@ def run_fetch(config_path: str) -> RunResult:
 
     return RunResult(
         ok=True,
-        message=f"fetched {len(prayer_times)} prayer times for {today} -> {config.state_file}",
+        message=f"fetched {len(daily_times.prayers)} prayer times for {today} -> {config.state_file}",
     )
 
 
@@ -163,20 +163,21 @@ def last_run_status() -> dict:
 
 def today_preview(config: Config) -> dict:
     today = date.today()
-    html = fetch_html(config.mosque.slug)
-    conf = extract_conf_data(html)
-    prayer_times = today_prayer_times(
-        conf, today, tz_override=config.mosque.timezone_override
+    provider = get_provider(config.mosque.provider)
+    daily_times = provider.fetch_prayer_times(
+        config.mosque.identifier,
+        today,
+        timezone_override=config.mosque.timezone_override,
     )
-    tz_name = config.mosque.timezone_override or conf.get("timezone")
+    prayer_times = daily_times.prayers
 
     now = datetime.now(prayer_times["fajr"].iqama.tzinfo)
     next_prayer = _find_next_prayer(config, prayer_times, now)
 
     return {
         "date": today.isoformat(),
-        "timezone": tz_name,
-        "mosque_name": conf.get("name"),
+        "timezone": daily_times.timezone,
+        "mosque_name": daily_times.mosque_name,
         "prayers": {
             name: {"adhan": pt.adhan.isoformat(), "iqama": pt.iqama.isoformat()}
             for name, pt in prayer_times.items()

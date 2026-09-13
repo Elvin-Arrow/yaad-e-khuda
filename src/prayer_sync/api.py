@@ -25,7 +25,7 @@ from .config import (
     read_raw,
 )
 from .errors import PrayerSyncError
-from .mawaqit import extract_conf_data, fetch_html, today_prayer_times
+from .providers import get_provider
 
 # Pending OAuth "state" tokens, keyed to themselves -- this is a single-user,
 # single-process app (same assumption the rest of the API makes), so an
@@ -114,14 +114,17 @@ def create_app(config_path: str = "config.yaml") -> FastAPI:
 
     @app.post("/api/setup/mosque")
     def setup_mosque(body: MosqueSetupRequest):
-        html = fetch_html(body.slug)
-        conf = extract_conf_data(html)
-        prayer_times = today_prayer_times(conf, date.today())
+        provider = get_provider("mawaqit")
+        daily_times = provider.fetch_prayer_times(body.slug, date.today())
 
         merge_raw(
             config_path,
             {
-                "mosque": {"slug": body.slug, "timezone_override": None},
+                "mosque": {
+                    "provider": "mawaqit",
+                    "identifier": body.slug,
+                    "timezone_override": None,
+                },
                 "prayers": default_prayers_section(),
                 "state_file": DEFAULT_STATE_FILE,
                 "schedule": {"time": DEFAULT_SCHEDULE_TIME},
@@ -129,8 +132,8 @@ def create_app(config_path: str = "config.yaml") -> FastAPI:
         )
         return {
             "ok": True,
-            "timezone": conf.get("timezone"),
-            "preview": _prayer_times_response(prayer_times),
+            "timezone": daily_times.timezone,
+            "preview": _prayer_times_response(daily_times.prayers),
         }
 
     @app.get("/api/config")
@@ -138,7 +141,11 @@ def create_app(config_path: str = "config.yaml") -> FastAPI:
         config = load_config(config_path)
         return {
             "mosque": {
-                "slug": config.mosque.slug,
+                # The current web UI supports MAWAQIT only, so retain its
+                # established slug-shaped response while the persisted config
+                # uses the provider-neutral identifier.
+                "slug": config.mosque.identifier,
+                "provider": config.mosque.provider,
                 "timezone_override": config.mosque.timezone_override,
             },
             "icloud": (
@@ -270,19 +277,27 @@ def create_app(config_path: str = "config.yaml") -> FastAPI:
     @app.put("/api/config/mosque")
     def update_mosque(body: MosqueUpdateRequest):
         config = load_config(config_path)
-        slug = body.slug or config.mosque.slug
+        slug = body.slug or config.mosque.identifier
         timezone_override = (
             body.timezone_override
             if body.timezone_override is not None
             else config.mosque.timezone_override
         )
 
-        if slug != config.mosque.slug:
-            extract_conf_data(fetch_html(slug))
+        if slug != config.mosque.identifier:
+            get_provider(config.mosque.provider).fetch_prayer_times(
+                slug, date.today(), timezone_override=timezone_override
+            )
 
         merge_raw(
             config_path,
-            {"mosque": {"slug": slug, "timezone_override": timezone_override}},
+            {
+                "mosque": {
+                    "provider": config.mosque.provider,
+                    "identifier": slug,
+                    "timezone_override": timezone_override,
+                }
+            },
         )
         return {"ok": True}
 
