@@ -146,6 +146,20 @@ def test_setup_mosque_saves_and_returns_preview(
     }
 
 
+def test_setup_mosque_migrates_legacy_slug(client, config_path, monkeypatch) -> None:
+    from prayer_sync.config import read_raw, write_raw
+
+    write_raw(config_path, {"mosque": {"slug": "old-mosque"}})
+    _use_fixture_provider(monkeypatch)
+
+    resp = client.post("/api/setup/mosque", json={"slug": "new-mosque"})
+
+    assert resp.status_code == 200
+    mosque = read_raw(config_path)["mosque"]
+    assert mosque["identifier"] == "new-mosque"
+    assert "slug" not in mosque
+
+
 def _complete_onboarding(client: TestClient, fixture_html: str, monkeypatch) -> None:
     monkeypatch.setattr(api_module.caldav_sync, "connect", lambda a, p: "PRINCIPAL")
     client.post(
@@ -196,6 +210,25 @@ def test_update_mosque_resolves_configured_provider_and_persists_identifier(
 
     assert read_raw(config_path)["mosque"]["identifier"] == "new-mosque"
     assert read_raw(config_path)["mosque"]["provider"] == "mawaqit"
+
+
+def test_update_mosque_migrates_legacy_slug(
+    client, config_path, fixture_html, monkeypatch
+) -> None:
+    from prayer_sync.config import read_raw, write_raw
+
+    _complete_onboarding(client, fixture_html, monkeypatch)
+    raw = read_raw(config_path)
+    raw["mosque"] = {"slug": "old-mosque"}
+    write_raw(config_path, raw)
+    _use_fixture_provider(monkeypatch)
+
+    resp = client.put("/api/config/mosque", json={"slug": "new-mosque"})
+
+    assert resp.status_code == 200
+    mosque = read_raw(config_path)["mosque"]
+    assert mosque["identifier"] == "new-mosque"
+    assert "slug" not in mosque
 
 
 def test_update_prayers_persists_and_validates(client, fixture_html, monkeypatch) -> None:
